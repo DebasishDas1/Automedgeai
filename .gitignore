@@ -23,6 +23,14 @@ backend/.env
 backend/venv/
 backend/ENV/
 backend/.python-version
+backend/.env.example
+backend/secrets/
+backend/venv/
+backend/*.json          # catches any service account keys
+backend/__pycache__/
+backend/.venv/
+backend/*.pyc
+backend/.DS_Store
 
 # Logs
 *.log

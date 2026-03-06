@@ -1,0 +1,340 @@
+++++++++++++++++++++++++++++++
+UI/UX
+++++++++++++++++++++++++++++++
+
+# Automedge — HVAC Vertical Landing Page Prompt
+# Route: automedge.com/hvac
+# Purpose: Cold email target link — HVAC owner clicks, sees their industry
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DESIGN LANGUAGE  (match homepage exactly)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Background       #EEF2F5  (same light blue-gray as homepage)
+Primary text     #1A1A1A  (near black)
+Accent           #00C2A8  (teal — automedge brand)
+CTA button       #F97316  (orange — match homepage "Schedule a Call")
+Font display     Outfit 800/900 (headings, editorial size)
+Font body        Plus Jakarta Sans 400/500
+Card style       white bg, border-radius 16px, soft shadow
+Floating badges  pill shape, white bg, soft shadow — no border
+Nav              identical to homepage — transparent, blur on scroll
+Image style      full-bleed, rounded-lg corners, overlapping text above
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NEXT.JS FILE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+File             app/hvac/page.tsx
+Type             React Server Component (no 'use client')
+Dynamic parts    DemoWorkflow — dynamic import with 'use client'
+                 BookingForm  — dynamic import with 'use client'
+
+export const metadata = {
+  title: 'HVAC Lead Automation — automedge',
+  description: 'Stop losing HVAC jobs to slow replies. Automedge
+    follows up with every lead in 60 seconds — while you are
+    still on the job site.',
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 1 — NAV
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Identical to homepage nav.
+Swap center pill to show: 🔧 Built for HVAC
+Active nav link: HVAC (underline or bold)
+Right side: "Schedule a Demo" orange button
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 2 — HERO  (match Parker homepage layout exactly)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Layout:
+  - LARGE editorial headline above image (same as "Year-Round Comfort")
+  - Headline overlaps the top edge of the image
+  - 3 floating stat badges scattered around headline
+  - Full-bleed image below headline, rounded corners
+  - 2 floating cards overlaid on bottom corners of image
+
+HEADLINE  (Outfit 900, ~72-80px, tight -0.04em tracking):
+  Line 1: "Never Miss an"              ← dark #1A1A1A
+  Line 2: "HVAC Lead Again"            ← teal #00C2A8 on "HVAC"
+                                          dark on rest
+
+FLOATING STAT BADGES  (pill, white bg, shadow, scattered):
+  Badge 1 (top-right of headline):  "78% hire first responder"
+  Badge 2 (left of line 2):         "47s avg response time"
+  Badge 3 (below line 2):           "3.2× more jobs booked"
+
+HERO IMAGE:
+  Full-bleed photo placeholder: HVAC technician on a job site
+  Use next/image, priority={true}, fill or aspect-video
+  Rounded-lg corners, slight overlap with headline above
+  Image should be warm/action-oriented — technician working,
+  not a stock handshake photo
+
+BOTTOM-LEFT CARD  (floating over image, white, rounded-xl):
+  ⭐⭐⭐⭐⭐
+  "4.9 Average Score"
+  "Based on 1,200+ HVAC companies"
+
+BOTTOM-RIGHT CARD  (floating over image, white, rounded-xl):
+  "Missed Call → SMS Sent"
+  "In under 60 seconds"
+  [Details button — dark pill]  [→ arrow button — dark circle]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 3 — LIVE WORKFLOW DEMO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Layout: 2-column grid — left: copy, right: demo panel
+
+Left side:
+  Eyebrow label:  "LIVE AUTOMATION DEMO"
+  Heading:        "Watch your next lead
+                   get handled automatically"
+  Subtext:        "This is exactly what happens the moment
+                   an HVAC lead hits your inbox — no human
+                   needed, no lead dropped."
+  CTA:            "Try It With Your Business →" (orange button)
+
+Right side — DemoWorkflow component ('use client'):
+  Dark navy panel (#0D1B2A), border-radius 16px
+  Top bar: traffic lights + "automedge — HVAC" + ● LIVE badge
+  Incoming lead card:
+    Avatar: MJ  |  Mike Johnson
+    "AC not cooling · 3-bed home · Dallas TX"
+    Source badge: Google LSA (amber)
+  5 workflow steps animating sequentially (1.8s apart):
+    Step 1  📥  Lead Captured        → 0s
+    Step 2  📱  SMS Sent to Mike     → 47s
+    Step 3  🔔  Technician Alerted   → 1m 12s
+    Step 4  📅  Appointment Booked   → 8m 34s
+    Step 5  ⭐  Review Requested     → +2 days
+  Progress bar filling across all steps
+  "↺ Replay" button — resets and loops every 12s
+  Active step: teal glow + spinning ring
+  Done step: green check
+  Inactive: 35% opacity
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 4 — PAIN POINTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Layout:   2×2 grid of white cards, rounded-xl, soft shadow
+Eyebrow:  "WHAT WE FIX"
+Heading:  "Every problem HVAC owners tell us about"
+
+Card 1:   📞  "Missed the call while on a job"
+          Body: "A homeowner calls, hits voicemail, calls your
+                 competitor next. You never even knew."
+          Fix:  ✓ Automedge texts them within 60s of any missed call
+
+Card 2:   🗂️  "Leads coming from 5 different apps"
+          Body: "Google, Angi, Thumbtack, your website, Facebook —
+                 you check 5 apps and still miss leads."
+          Fix:  ✓ All sources in one inbox, deduplicated, automatic
+
+Card 3:   📄  "Sent a quote, never heard back"
+          Body: "You did the estimate, sent it, they went cold.
+                 No follow-up system means money left on the table."
+          Fix:  ✓ 5-touch follow-up sequence runs after every quote
+
+Card 4:   ⭐  "Forget to ask for reviews"
+          Body: "You do great work. Your Google rating doesn't show
+                 it because asking feels awkward and easy to forget."
+          Fix:  ✓ Review request sent automatically 2hrs after job close
+
+Card style:
+  White bg, padding 28px, border-radius 16px
+  Emoji in a teal-muted circle (bg accent-muted)
+  Fix row: teal left border or green ✓ with teal text
+  Hover: card lifts 4px, teal border appears
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 5 — HOW IT WORKS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Layout:   Horizontal 5-step flow with connecting arrows
+          On mobile: vertical timeline
+Eyebrow:  "HOW IT WORKS"
+Heading:  "From lead in — to job booked in under 10 minutes"
+
+Steps (icon + label + description):
+  1  📡  Lead Arrives
+         Google, Angi, phone, web form — all in one inbox
+  →
+  2  ⚡  Instant Reply
+         Personalized SMS + email in under 60 seconds
+  →
+  3  🔄  Follow-Up Runs
+         5-touch sequence, fully automated, no manual work
+  →
+  4  📅  Job Scheduled
+         Customer self-books. Tech dispatched automatically.
+  →
+  5  ✅  Review Collected
+         2 hours after job close. Automatic. Every time.
+
+Step nodes: white circle, teal border on hover
+Arrows: teal color, fade in on scroll
+Mobile: vertical list with teal left-border timeline line
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 6 — FEATURES TABS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+'use client' component — tab switching
+
+4 tabs:
+  Lead Management | Auto SMS/Email | Dispatch | Reviews
+
+Layout per tab: 2-column — left: feature list, right: mockup
+
+TAB 1 — Lead Management
+  Features (green ✓ each):
+  - Unified inbox: Google LSA, Angi, Thumbtack, web, phone
+  - Lead scoring by urgency (emergency vs general)
+  - Pipeline view: New → Contacted → Quoted → Booked → Done
+  - Source attribution: know which channels convert best
+  Right mockup: mini pipeline kanban cards in white panel
+
+TAB 2 — Auto SMS/Email
+  Features:
+  - First reply in 47 seconds — before competitor calls back
+  - Personalized with customer name + service requested
+  - 5-touch follow-up on unseen quotes
+  - Branded sender name — looks like your team, not a bot
+  Right mockup: SMS conversation bubbles
+    Incoming: "Hi, my AC stopped working, need help asap"
+    Outgoing: "Hi Sarah! This is Mike from CoolAir HVAC.
+               We got your request — can you do tomorrow 2pm?"
+    Incoming: "Yes perfect!"
+
+TAB 3 — Dispatch
+  Features:
+  - Nearest available tech gets push notification
+  - Customer gets tech name + ETA via SMS
+  - Calendar sync: Google Calendar + Outlook
+  - Job notes attached automatically from lead details
+  Right mockup: tech assignment card
+    Jake T. · 2.1 miles away · Available now
+    [Assign Job] button (orange)
+
+TAB 4 — Reviews
+  Features:
+  - Sent 2 hours after job marked complete
+  - One-tap Google review link
+  - Only sends to satisfied customers (filters low ratings)
+  - Monthly review report emailed to owner
+  Right mockup: SMS preview
+    "Mike, thanks for choosing CoolAir! Happy with the
+     service? Tap here to leave a quick Google review 👇
+     g.page/coolair-hvac"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 7 — SOCIAL PROOF
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Layout:  3 testimonial cards side by side
+         On mobile: horizontal scroll snap
+
+Each card:
+  ⭐⭐⭐⭐⭐
+  Quote (14px, #1A1A1A, italic)
+  Name + company + city
+  "HVAC Owner" badge (teal pill)
+
+Testimonial 1:
+  "We were missing 30% of our leads because we couldn't
+   answer the phone on jobs. Automedge fixed that in a day."
+  — James R., Dallas TX
+
+Testimonial 2:
+  "The quote follow-up alone recovered 4 jobs last month
+   that I would have just forgotten about."
+  — Maria C., Phoenix AZ
+
+Testimonial 3:
+  "Response time went from hours to 47 seconds. We went
+   from 2 Google reviews a month to 18."
+  — Tom H., Atlanta GA
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 8 — CTA / BOOK DEMO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Layout:    Centered, full-width section
+           bg: white card, rounded-2xl, subtle shadow
+
+Heading:   "See it running with
+            your actual business name"
+Sub:       "Book a 15-min call. We set it up live,
+            using your leads, your branding."
+
+Form ('use client', RHF + Zod):
+  Input: Your name         (placeholder: "Mike Johnson")
+  Input: Business name     (placeholder: "CoolAir HVAC")
+  Input: Work email        (placeholder: "mike@coolair.com")
+  Input: Phone (optional)  (placeholder: "+1 555 000 0000")
+  Select: Team size        ["Just me", "2-5", "6-15", "15+"]
+  Button: "Book My Free Demo →" (orange, full width on mobile)
+
+Validation (Zod):
+  name: z.string().min(2)
+  business: z.string().min(2)
+  email: z.string().email()
+  phone: z.string().optional()
+  teamSize: z.enum(['solo','2-5','6-15','15+'])
+
+On submit:
+  POST /api/book-demo
+  Body: { name, business, email, phone, teamSize, vertical: 'hvac' }
+  Success: replace form with
+    "✅ You're booked, {name}! Check your email for the link."
+  Error: show inline error, keep form filled
+
+Fine print below button:
+  "No credit card. No setup fee. Cancel anytime."
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECTION 9 — FOOTER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Identical to homepage footer.
+Highlight HVAC link as active/current.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ANIMATIONS  (Framer Motion, 'use client' only)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+All use useInView({ once: true, margin: "-80px" })
+
+Headline:       fadeUp, stagger 0.1s per word
+Stat badges:    scaleIn, stagger 0.15s, delay after headline
+Hero image:     fadeIn, 0.6s
+Pain cards:     fadeUp, stagger 0.08s per card
+Flow steps:     fadeUp left-to-right, stagger 0.12s
+Testimonials:   fadeUp, stagger 0.1s
+Demo panel:     scaleIn from 0.96, once on scroll
+
+Easing for all: cubic-bezier(0.22, 1, 0.36, 1)
+Never animate more than one section at a time.
+prefers-reduced-motion: skip all animations, show static.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MOBILE RULES  (375px minimum)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Hero headline:    clamp(2.2rem, 7vw, 5rem)
+Stat badges:      stack below headline, no overlap on mobile
+2-col grids:      collapse to 1-col below md breakpoint
+Pain cards:       full width, scroll snap optional
+Feature tabs:     horizontal scroll on tab list (no wrap)
+How it works:     vertical timeline on mobile
+Testimonials:     horizontal scroll-snap
+CTA form:         all inputs full width, stacked
+Touch targets:    all buttons min 44×44px
+Safe area:        pb-safe on bottom CTA section
+```
+
+---
+
+**How to use this:**
+
+Paste into Cursor with your existing codebase open. Since you already have the homepage built in the Parker style, Cursor will match the component patterns exactly. The prompt references your existing CSS variables (`--accent`, `--background`, `font-display`) so everything inherits automatically.
+
+For the other 3 verticals, change only these variables:
+```
+HVAC         → Mike Johnson · AC not cooling · Dallas TX · Google LSA
+Roofing      → Sarah Chen · Storm damage · Atlanta GA · Angi
+Plumbing     → Carlos Rivera · Burst pipe · Phoenix AZ · Phone
+Pest Control → Emma Davis · Termite inspection · Tampa FL · Web Form
