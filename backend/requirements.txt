@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+langgraph
+langchain-openai
+sqlalchemy[asyncio]
+asyncpg
+firebase-admin
+python-dotenv
+pydantic-settings
+httpx
+pydantic[email]
