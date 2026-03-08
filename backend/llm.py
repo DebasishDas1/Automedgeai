@@ -7,7 +7,7 @@ OpenAI_llm = ChatOpenAI(
         model="gpt-4", 
         openai_api_key=settings.OPENAI_API_KEY,
         temperature=0,
-        max_tokens=3000,
+        max_tokens=settings.MAX_TOKEN,
         max_retries=2,
     )
 
@@ -22,7 +22,7 @@ Groq_llm = ChatGroq(
 Ollama_llm = ChatOllama(
         model="qwen3:1.7b", 
         temperature=0,
-        max_tokens=3000,
+        max_tokens=settings.MAX_TOKEN,
     )
 
 llm = Ollama_llm

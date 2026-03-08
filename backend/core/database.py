@@ -3,7 +3,7 @@ import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text, UUID
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 import uuid
 from dotenv import load_dotenv
 
@@ -73,6 +73,22 @@ class WorkflowEvent(Base):
     status = Column(String, nullable=False)      # active|done|error
     timestamp_str = Column(String, nullable=True) # "47s" "1m 12s"
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+    
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id = Column(String, unique=True, nullable=False)
+    vertical = Column(String, nullable=False, default="hvac")
+    state = Column(JSONB, nullable=False)
+    score = Column(String, nullable=True)
+    sheet_row = Column(Integer, nullable=True)
+    sheet_tab = Column(String, nullable=True)
+    email_sent = Column(Boolean, default=False)
+    appt_booked = Column(Boolean, default=False)
+    is_complete = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
 async def get_db():
     async with AsyncSessionLocal() as session:
