@@ -18,6 +18,24 @@ const testimonials = [
         name: "Tom H.",
         city: "Atlanta GA",
         company: "Heritage Mechanical"
+    },
+    {
+        quote: "This software is like having a full-time dispatch assistant working 24/7.",
+        name: "Kevin L.",
+        city: "Chicago IL",
+        company: "Windy City Cooling"
+    },
+    {
+        quote: "Customers literally tell us they booked with us because we replied so fast.",
+        name: "Sarah B.",
+        city: "Austin TX",
+        company: "Lone Star A/C"
+    },
+    {
+        quote: "Absolutely a game changer. Less time on the phone, more time actually doing the work.",
+        name: "David T.",
+        city: "Denver CO",
+        company: "Peak Plumbing & Heating"
     }
 ];
 

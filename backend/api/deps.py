@@ -1,5 +1,6 @@
 from fastapi import Depends, HTTPException, Header
 from core.firebase import verify_token
+from core.database import get_db
 
 async def get_current_user(authorization: str = Header(...)):
     token = authorization.replace("Bearer ", "")

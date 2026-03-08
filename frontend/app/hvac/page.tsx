@@ -5,10 +5,24 @@ import { HvacNavbar } from '@/components/hvac/HvacNavbar';
 import { HvacHero } from '@/components/hvac/HvacHero';
 import { HvacFooter } from '@/components/hvac/HvacFooter';
 
-// Dynamically import heavy/non-critical components
-const HvacWorkflowDemo = dynamic(() => import('@/components/hvac/HvacWorkflowDemo').then(mod => mod.HvacWorkflowDemo));
-const HvacFeatures = dynamic(() => import('@/components/hvac/HvacFeatures').then(mod => mod.HvacFeatures));
-const LeadForm = dynamic(() => import('@/components/shared/LeadForm').then(mod => mod.LeadForm));
+// Component fallbacks/skeletons for lazy loading
+const ComponentSkeleton = ({ height = "h-[400px]" }) => (
+    <div className={`w-full max-w-6xl mx-auto ${height} bg-slate-200/50 dark:bg-slate-800/50 animate-pulse rounded-3xl my-12`}></div>
+);
+
+// Dynamically import heavy/non-critical components with skeleton fallbacks
+const HvacWorkflowDemo = dynamic(() => import('@/components/hvac/HvacWorkflowDemo').then(mod => mod.HvacWorkflowDemo), {
+    loading: () => <ComponentSkeleton />
+});
+const HvacFeatures = dynamic(() => import('@/components/hvac/HvacFeatures').then(mod => mod.HvacFeatures), {
+    loading: () => <ComponentSkeleton height="h-[600px]" />
+});
+const HvacSocialProof = dynamic(() => import('@/components/hvac/HvacSocialProof').then(mod => mod.HvacSocialProof), {
+    loading: () => <ComponentSkeleton />
+});
+const LeadForm = dynamic(() => import('@/components/shared/LeadForm').then(mod => mod.LeadForm), {
+    loading: () => <ComponentSkeleton />
+});
 const Chatbot = dynamic(() => import('@/components/shared/Chatbot').then(mod => mod.Chatbot));
 
 export const metadata: Metadata = {
@@ -29,6 +43,7 @@ export default function HvacLandingPage() {
             <div className="flex flex-col">
                 <HvacHero />
                 <HvacWorkflowDemo />
+                <HvacSocialProof />
                 <HvacFeatures />
 
                 <section className="py-32 px-6 bg-white dark:bg-slate-900 transition-colors duration-500" id="contact">
