@@ -23,7 +23,9 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str
 
     # OpenAI (LangGraph)
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: str | None = None
+    GROQ_API_KEY: str | None = None
+    MAX_TOKEN: int = 3000
 
     # CORS
     ALLOWED_ORIGINS: list[str] = ["https://automedge.com", "http://localhost:3000"]

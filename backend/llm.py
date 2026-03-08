@@ -12,7 +12,7 @@ OpenAI_llm = ChatOpenAI(
     )
 
 Groq_llm = ChatGroq(
-    model=settings.GROQ_MODEL,
+    model="llama-3.1-8b-instant",
     groq_api_key=settings.GROQ_API_KEY,
     temperature=0.4,
     max_tokens=settings.MAX_TOKEN,
