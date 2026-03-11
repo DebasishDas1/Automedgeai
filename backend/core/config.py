@@ -31,6 +31,7 @@ class Settings(BaseSettings):
 
     # Email
     RESEND_API_KEY: Optional[str] = None
+    EMAIL_FROM: Optional[str] = None
 
     # LLM
     GROQ_API_KEY: Optional[str] = None

@@ -11,8 +11,17 @@ from core.config import settings
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=False,
+
+    # important for serverless Postgres
     pool_pre_ping=True,
-    connect_args={"ssl": True}
+    pool_recycle=300,
+
+    # connection pool tuning
+    pool_size=5,
+    max_overflow=10,
+
+    # asyncpg ssl config
+    connect_args={"ssl": "require"},
 )
 
 AsyncSessionLocal = async_sessionmaker(
@@ -25,28 +34,16 @@ Base = declarative_base()
 class Lead(Base):
     __tablename__ = "leads"
 
-    id            = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name          = Column(String, nullable=False)
-    phone         = Column(String, nullable=True)
-    email         = Column(String, nullable=True)
-    source        = Column(String, nullable=False)       # google|angi|phone|web|chat
-    vertical      = Column(String, nullable=False)       # hvac|roofing|plumbing|pest_control
-    issue         = Column(Text, nullable=True)
-    city          = Column(String, nullable=True)
-    stage         = Column(String, default="new")        # new|contacted|quoted|booked|done
-    urgency       = Column(String, default="normal")     # emergency|urgent|normal
-    score         = Column(String, nullable=True)        # hot|warm|cold
-    score_reason  = Column(Text, nullable=True)
-    sms_sent      = Column(Boolean, default=False)
-    tech_notified = Column(Boolean, default=False)
-    booked_at     = Column(DateTime, nullable=True)
-    review_sent   = Column(Boolean, default=False)
-    sheet_row     = Column(Integer, nullable=True)
-    session_id    = Column(String, nullable=True)        # linked chat session
-    user_id       = Column(String, nullable=False)       # Firebase UID
-    created_at    = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at    = Column(DateTime, default=datetime.datetime.utcnow,
-                           onupdate=datetime.datetime.utcnow)
+    id         = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name       = Column(String,   nullable=True)
+    email      = Column(String,   nullable=True)
+    phone      = Column(String,   nullable=True)
+    issue      = Column(Text,     nullable=True)
+    address    = Column(String,   nullable=True)   # city / zip / full address
+    vertical   = Column(String,   nullable=False)  # hvac|roofing|plumbing|pest_control
+    appt_at    = Column(DateTime, nullable=True)   # booked appointment datetime (null = not booked)
+    session_id = Column(String,   nullable=True)   # linked chat session
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
 class Job(Base):

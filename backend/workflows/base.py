@@ -1,151 +1,156 @@
-from typing import TypedDict, Literal, Optional
-from datetime import datetime
-from tools.sheets import sheets_tool
-from tools.sms import sms_tool
-from tools.review import review_tool
-import logging
-
-logger = logging.getLogger(__name__)
-
-# Every vertical's graph uses this same state shape
-class LeadState(TypedDict):
-    lead_id:      str
-    name:         str
-    phone:        str
-    email:        str
-    source:       str          # google|angi|phone|web
-    vertical:     str          # hvac|roofing|plumbing|pest
-    issue:        str          # "AC not cooling"
-    urgency:      str          # emergency|urgent|normal
-    city:         str
-    stage:        str          # new|contacted|quoted|booked|done
-    sms_sent:     bool
-    tech_notified:bool
-    booked_at:    Optional[datetime]
-    review_sent:  bool
-    events:       list[dict]   # audit trail streamed to frontend
-
-def add_event(state: LeadState, label: str, status: str = "done") -> None:
-    step_num = len(state.get("events", [])) + 1
-    state.get("events", []).append({
-        "step": step_num,
-        "label": label,
-        "status": status,
-        "timestamp_str": "now" # In real app, calculate from start
-    })
-
-# Shared nodes every vertical uses
-def capture_lead(state: LeadState) -> LeadState:
-    logger.info(f"Node [capture_lead] for {state['name']}")
-    
-    # Save to Google Sheets
-    row = [
-        datetime.now().isoformat(),
-        state['name'],
-        state['phone'],
-        state['email'],
-        state['source'],
-        state['issue'],
-        state['city']
-    ]
-    sheets_tool.append_row(state['vertical'], row)
-    
-    add_event(state, "Lead Captured & Validated", "done")
-    state['stage'] = "contacted"
-    return state
-
-def send_sms(state: LeadState) -> LeadState:
-    logger.info(f"Node [send_sms] to {state['phone']}")
-    
-    message = f"Hi {state['name']}, thanks for reaching out to Automedge about your {state['vertical']} issue. A technician will contact you shortly."
-    success = sms_tool.send_sms(state['phone'], message)
-    
-    state['sms_sent'] = success
-    add_event(state, "SMS Notification Sent", "done" if success else "error")
-    return state
-
-def request_review(state: LeadState) -> LeadState:
-    logger.info(f"Node [request_review] for {state['name']}")
-    
-    success = review_tool.request_review(state['name'], state['email'], state['phone'])
-    
-    state['review_sent'] = success
-    add_event(state, "Review Request Sent", "done" if success else "error")
-    return state
-
-# -----------------------------------------------------------------------------
-# Common Graph Node Helpers (Shared by Chat Workflows)
-# -----------------------------------------------------------------------------
-
+# workflows/base.py
+# Shared helpers used by ALL vertical nodes.
+# Import from here instead of redefining in each vertical's nodes.py.
+#
+# What lives here:
+#   - State helpers (_field_missing, _merge_extracted, etc.)
+#   - LangChain message conversion
+#   - Appointment slot generation
+#   - _parse_json_from_llm
+#   - rule_score_lead  ← replaces the 607-token LLM scoring call
+#
+# What does NOT live here:
+#   - Tool imports (sheets/sms/review) — import lazily in the node that needs them
+#   - LeadState TypedDict — removed (use ChatState from workflows/state.py)
 import json
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-from datetime import timedelta
+import logging
+from datetime import datetime, timedelta
 
-_MISSING = object()
+from langchain_core.messages import HumanMessage, AIMessage
 
-def _field_missing(state: dict, key: str) -> bool:
-    """Returns True only if field has never been set. False is a valid value."""
+logger   = logging.getLogger(__name__)
+_MISSING = object()   # sentinel: distinguishes None from "never set"
+
+
+# ── Field helpers ─────────────────────────────────────────────────────────────
+
+def field_missing(state: dict, key: str) -> bool:
+    """True only if field was never set. bool False is a valid collected value."""
     val = state.get(key, _MISSING)
     return val is _MISSING or val is None
 
-def _parse_json_from_llm(content: str) -> dict | None:
-    """Safely extract the first JSON object from an LLM response string."""
-    start = content.find("{")
-    end   = content.rfind("}") + 1
-    if start == -1 or end == 0:
-        return None
-    try:
-        return json.loads(content[start:end])
-    except json.JSONDecodeError as e:
-        logger.warning(f"JSON parse failed: {e} | raw: {content[start:end][:200]}")
-        return None
 
-def _merge_extracted(state: dict, extracted: dict) -> dict:
+def merge_extracted(state: dict, extracted: dict) -> dict:
     """
-    Merge extracted fields into state.
-    Rules:
-      - Never overwrite an existing non-None value (first capture wins)
-      - Exception: is_homeowner — bool False is a valid value, use _field_missing
+    Merge LLM-extracted fields into state.
+    First-capture wins — never overwrites an already-set value.
     """
     for k, v in extracted.items():
         if v is None:
             continue
-        if _field_missing(state, k):
+        if field_missing(state, k):
             state[k] = v
-            logger.debug(f"Extracted field: {k} = {v}")
+            logger.debug(f"field captured: {k}={v!r}")
     return state
 
-def _build_chat_messages(state: dict) -> list:
-    """Convert state messages list to LangChain message objects."""
-    result = []
+
+def parse_json(content: str) -> dict | None:
+    """Extract first JSON object from an LLM response. Returns None on failure."""
+    s = content.find("{")
+    e = content.rfind("}") + 1
+    if s == -1 or e == 0:
+        return None
+    try:
+        return json.loads(content[s:e])
+    except json.JSONDecodeError as exc:
+        logger.warning(f"JSON parse failed: {exc} | snippet: {content[s:s+120]}")
+        return None
+
+
+# ── Message helpers ───────────────────────────────────────────────────────────
+
+def build_lc_messages(state: dict) -> list:
+    """Convert state['messages'] → list of LangChain HumanMessage/AIMessage."""
+    out = []
     for m in state.get("messages", []):
         role    = m.get("role")
         content = m.get("content", "")
         if role == "user":
-            result.append(HumanMessage(content=content))
+            out.append(HumanMessage(content=content))
         elif role == "assistant":
-            result.append(AIMessage(content=content))
-    return result
+            out.append(AIMessage(content=content))
+    return out
 
-def _last_user_message(state: dict) -> str | None:
-    """Returns the content of the most recent user message."""
-    messages = state.get("messages", [])
+
+def last_user_msg(state: dict) -> str | None:
+    """Content of the most recent user message, or None."""
     return next(
-        (m["content"] for m in reversed(messages) if m.get("role") == "user"),
-        None
+        (m["content"] for m in reversed(state.get("messages", []))
+         if m.get("role") == "user"),
+        None,
     )
 
-def _full_transcript(state: dict) -> str:
-    """Returns full conversation as plain text for extraction/summary."""
+
+def full_transcript(state: dict) -> str:
+    """Flat text of entire conversation — used for final extraction pass."""
     return "\n".join(
         f"{m['role'].upper()}: {m['content']}"
         for m in state.get("messages", [])
     )
 
-def get_appointment_slots() -> list[str]:
+
+# ── Appointment slots ─────────────────────────────────────────────────────────
+
+def get_appt_slots() -> list[str]:
+    """Three concrete appointment slot strings, starting tomorrow."""
     today = datetime.now()
     return [
         (today + timedelta(days=1)).strftime("%A, %b %d at 10:00 AM"),
         (today + timedelta(days=2)).strftime("%A, %b %d at 2:00 PM"),
         (today + timedelta(days=3)).strftime("%A, %b %d at 9:00 AM"),
     ]
+
+
+# ── Rule-based lead scorer ────────────────────────────────────────────────────
+# Replaces the 607-token LEAD_SCORING_SYSTEM LLM call with deterministic logic.
+# Saves ~750 tokens per post-chat run. Scores are consistent and debuggable.
+
+_EMERGENCY_KEYWORDS = {
+    "no heat", "no ac", "carbon monoxide", "gas smell", "flooding",
+    "water damage", "burst pipe", "smoke", "fire", "no hot water",
+}
+
+def rule_score_lead(state: dict) -> dict:
+    """
+    Score a lead without an LLM call.
+    Returns {"score": "hot"|"warm"|"cold", "score_number": int, "score_reason": str}
+    """
+    urgency        = (state.get("urgency") or "").lower()
+    is_homeowner   = state.get("is_homeowner")
+    has_email      = bool(state.get("email"))
+    has_phone      = bool(state.get("phone"))
+    appt_booked    = bool(state.get("appt_booked"))
+    turn_count     = int(state.get("turn_count") or 0)
+    issue          = (state.get("issue") or "").lower()
+    budget_signal  = (state.get("budget_signal") or "").lower()
+
+    score  = 50   # base
+    notes  = []
+
+    # ── Positive signals ──────────────────────────────────────────────────────
+    emergency = urgency == "urgent" or any(kw in issue for kw in _EMERGENCY_KEYWORDS)
+    if emergency:           score += 25; notes.append("emergency")
+    if is_homeowner:        score += 10; notes.append("homeowner")
+    if has_email:           score +=  5; notes.append("email")
+    if has_phone:           score +=  5; notes.append("phone")
+    if appt_booked:         score += 15; notes.append("appt booked")
+    if turn_count >= 6:     score +=  5; notes.append(f"{turn_count} turns")
+    if urgency == "this week": score += 5; notes.append("this week")
+
+    # ── Negative signals ──────────────────────────────────────────────────────
+    if budget_signal == "price shopping": score -= 20; notes.append("price shopping")
+    if is_homeowner is False:             score -= 25; notes.append("renter")
+    if not has_email and not has_phone:   score -= 15; notes.append("no contact")
+    if turn_count < 3:                   score -= 10; notes.append("low engagement")
+
+    score = max(0, min(100, score))
+
+    if score >= 70:
+        label = "hot"
+    elif score >= 35:
+        label = "warm"
+    else:
+        label = "cold"
+
+    reason = f"{label.upper()}: {', '.join(notes) if notes else 'standard lead'}."
+    return {"score": label, "score_number": score, "score_reason": reason}

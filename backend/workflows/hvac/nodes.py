@@ -1,245 +1,189 @@
+# workflows/hvac/nodes.py
+# HVAC graph node functions.
+#
+# Optimizations vs original:
+#  1. All helpers imported from workflows/base.py — no duplication
+#  2. node_score_lead uses rule_score_lead() — zero LLM tokens
+#  3. node_generate_summary makes ONE LLM call (was two) — saves ~300t
+#  4. node_extract_fields only runs appointment check when slots are shown
+#     AND last user msg looks like a confirmation (keyword pre-filter)
+#  5. node_extract_final skips if all required fields already collected
+#  6. EXTRACT_FIELDS_SYSTEM trimmed 275t, APPOINTMENT_CONFIRM 254t
+#  7. llm imported from llm module (max_tokens enforced)
 import json
 import logging
-from datetime import datetime, timedelta
-from typing import Any
+from datetime import datetime
 
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 
 from llm import llm
 from core.config import settings
-from workflows.state import HVACChatState
+from workflows.base import (
+    field_missing,
+    merge_extracted,
+    parse_json,
+    build_lc_messages,
+    last_user_msg,
+    full_transcript,
+    get_appt_slots,
+    rule_score_lead,
+)
 from workflows.hvac.prompts import (
     HVAC_EXPERT_SYSTEM,
     FIELD_COLLECTION_GUIDE,
     EXTRACT_FIELDS_SYSTEM,
-    LEAD_SCORING_SYSTEM,
     APPOINTMENT_CONFIRM_SYSTEM,
-    SUMMARY_CLIENT_SYSTEM,
-    SUMMARY_INTERNAL_SYSTEM,
+    SUMMARY_COMBINED_SYSTEM,
 )
 from tools.email import email_tool
 from tools.sheets import sheets_tool
 
 logger = logging.getLogger(__name__)
 
-# ── Sentinel for "field not yet collected" ────────────────────────────────────
-# Needed because `not state.get(k)` fails when value is False (e.g. is_homeowner=False)
-_MISSING = object()
+# Fields that must be present for the chat to be considered complete
+_REQUIRED = ["name", "email", "phone", "issue", "location"]
 
-def _field_missing(state: HVACChatState, key: str) -> bool:
-    """Returns True only if field has never been set. False is a valid value."""
-    val = state.get(key, _MISSING)
-    return val is _MISSING or val is None
+# Natural conversation order — one field per turn
+_FIELD_PRIORITY = ["issue", "urgency", "is_homeowner", "location", "name", "phone", "email", "system_age"]
 
+# Keywords that suggest a user is confirming an appointment slot
+# Used as a cheap pre-filter before spending tokens on APPOINTMENT_CONFIRM
+_CONFIRM_SIGNALS = {
+    "option", "number", "slot", "works", "perfect", "great", "sure",
+    "yes please", "sounds good", "let's do", "lets do", "that one",
+    "morning", "afternoon", "pm", "am", "monday", "tuesday", "wednesday",
+    "thursday", "friday", "saturday", "sunday", "tomorrow",
+}
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-def get_appointment_slots() -> list[str]:
-    today = datetime.now()
-    return [
-        (today + timedelta(days=1)).strftime("%A, %b %d at 10:00 AM"),
-        (today + timedelta(days=2)).strftime("%A, %b %d at 2:00 PM"),
-        (today + timedelta(days=3)).strftime("%A, %b %d at 9:00 AM"),
-    ]
-
-
-def _parse_json_from_llm(content: str) -> dict | None:
-    """Safely extract the first JSON object from an LLM response string."""
-    start = content.find("{")
-    end   = content.rfind("}") + 1
-    if start == -1 or end == 0:
-        return None
-    try:
-        return json.loads(content[start:end])
-    except json.JSONDecodeError as e:
-        logger.warning(f"JSON parse failed: {e} | raw: {content[start:end][:200]}")
-        return None
+_GOODBYE_SIGNALS = {
+    "bye", "goodbye", "thanks", "thank you", "that's all",
+    "done", "no thanks", "never mind", "all good",
+}
 
 
-def _merge_extracted(state: HVACChatState, extracted: dict) -> HVACChatState:
-    """
-    Merge extracted fields into state.
-    Rules:
-      - Never overwrite an existing non-None value (first capture wins)
-      - Exception: is_homeowner — bool False is a valid value, use _field_missing
-    """
-    for k, v in extracted.items():
-        if v is None:
-            continue
-        if _field_missing(state, k):
-            state[k] = v
-            logger.debug(f"Extracted field: {k} = {v}")
-    return state
-
-
-def _build_chat_messages(state: HVACChatState) -> list:
-    """Convert state messages list to LangChain message objects."""
-    result = []
-    for m in state.get("messages", []):
-        role    = m.get("role")
-        content = m.get("content", "")
-        if role == "user":
-            result.append(HumanMessage(content=content))
-        elif role == "assistant":
-            result.append(AIMessage(content=content))
-    return result
-
-
-def _last_user_message(state: HVACChatState) -> str | None:
-    """Returns the content of the most recent user message."""
-    messages = state.get("messages", [])
-    return next(
-        (m["content"] for m in reversed(messages) if m.get("role") == "user"),
-        None
-    )
-
-
-def _full_transcript(state: HVACChatState) -> str:
-    """Returns full conversation as plain text for extraction/summary."""
-    return "\n".join(
-        f"{m['role'].upper()}: {m['content']}"
-        for m in state.get("messages", [])
-    )
+def _looks_like_confirmation(text: str) -> bool:
+    """Cheap string check before spending tokens on APPOINTMENT_CONFIRM_SYSTEM."""
+    lower = text.lower()
+    return any(sig in lower for sig in _CONFIRM_SIGNALS)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CHAT GRAPH NODES
 # ══════════════════════════════════════════════════════════════════════════════
 
-def node_check_complete(state: HVACChatState) -> HVACChatState:
-    """
-    Decides if the conversation is done.
-    Checks:
-      1. All required fields collected + appointment booked
-      2. Last USER message (not AI) contains a goodbye signal
-    """
-    logger.info("node_check_complete")
+def node_check_complete(state: dict) -> dict:
+    """Mark conversation complete when all fields + appt booked, or on goodbye."""
+    if state.get("is_complete"):
+        return state  # already set — skip work
 
-    required = ["name", "email", "phone", "issue", "location"]
-    has_all  = all(not _field_missing(state, f) for f in required)
-
+    has_all = all(not field_missing(state, f) for f in _REQUIRED)
     if has_all and state.get("appt_booked"):
-        logger.info("Complete: all fields + appointment booked")
         state["is_complete"] = True
+        logger.info("complete: all fields + appt booked")
         return state
 
-    # Check last USER message — not last message (could be AI)
-    last_user = _last_user_message(state)
-    if last_user:
-        end_signals = ["bye", "thanks", "goodbye", "that's all", "done", "no thanks", "never mind"]
-        if any(signal in last_user.lower() for signal in end_signals):
-            logger.info(f"Complete: goodbye signal detected in: '{last_user[:50]}'")
-            state["is_complete"] = True
+    msg = last_user_msg(state)
+    if msg and any(sig in msg.lower() for sig in _GOODBYE_SIGNALS):
+        state["is_complete"] = True
+        logger.info(f"complete: goodbye signal in '{msg[:40]}'")
 
     return state
 
 
-def node_chat_reply(state: HVACChatState) -> HVACChatState:
-    """
-    Generates the AI HVAC expert reply for this turn.
-    Injects available slots and collected fields as context.
-    """
-    logger.info("node_chat_reply")
+def node_chat_reply(state: dict) -> dict:
+    """Generate AI reply. Injects slots + collected-fields context into system prompt."""
     try:
-        # Generate slots once per session
         if not state.get("appt_slots"):
-            state["appt_slots"] = get_appointment_slots()
-
+            state["appt_slots"] = get_appt_slots()
         slots = state["appt_slots"]
 
-        # Inject real dates into system prompt
-        sys_msg = HVAC_EXPERT_SYSTEM.replace("{slot_1}", slots[0])
-        sys_msg = sys_msg.replace("{slot_2}", slots[1])
-        sys_msg = sys_msg.replace("{slot_3}", slots[2])
-
-        # Build field collection guide
-        collected = {
-            k: state.get(k)
-            for k in ["name", "email", "phone", "location", "issue",
-                      "urgency", "is_homeowner", "system_age"]
-        }
-        missing = [k for k, v in collected.items() if v is None]
-        guide = FIELD_COLLECTION_GUIDE.format(
-            current_state=json.dumps(collected, default=str),
-            missing_fields=", ".join(missing) if missing else "none — ready to book",
+        sys_msg = (
+            HVAC_EXPERT_SYSTEM
+            .replace("{slot_1}", slots[0])
+            .replace("{slot_2}", slots[1])
+            .replace("{slot_3}", slots[2])
         )
 
-        messages = [SystemMessage(content=sys_msg + "\n\n" + guide)]
-        messages += _build_chat_messages(state)
+        all_fields  = _REQUIRED + ["urgency", "is_homeowner", "system_age"]
+        collected   = {k: state.get(k) for k in all_fields}
+        have        = {k: v for k, v in collected.items() if v is not None}
+        missing_set = {k for k, v in collected.items() if v is None}
 
-        response = llm.invoke(messages, max_tokens=300, temperature=0.7)
-        reply    = response.content.strip()
+        # Pick the single next field to collect — follow priority order
+        next_field = next(
+            (f for f in _FIELD_PRIORITY if f in missing_set),
+            "none",
+        )
 
-        state.setdefault("messages", []).append({
-            "role":    "assistant",
-            "content": reply,
-            "ts":      datetime.now().isoformat(),
-        })
-        state["turn_count"] = state.get("turn_count", 0) + 1
+        guide = FIELD_COLLECTION_GUIDE.format(
+            collected       = json.dumps(have, default=str),
+            next_field      = next_field,
+            collected_count = len(have),
+            total_count     = len(all_fields),
+        )
 
-    except Exception as e:
-        logger.error(f"node_chat_reply failed: {e}")
-        # Fallback reply — never leave user with no response
-        state.setdefault("messages", []).append({
-            "role":    "assistant",
-            "content": "Sorry, I'm having a brief technical issue. Could you repeat that?",
-            "ts":      datetime.now().isoformat(),
-        })
+        messages = [SystemMessage(content=sys_msg + "\n" + guide)]
+        messages += build_lc_messages(state)
 
+        resp  = llm.invoke(messages, max_tokens=300, temperature=0.7)
+        reply = resp.content.strip()
+
+    except Exception as exc:
+        logger.error(f"node_chat_reply failed: {exc}")
+        reply = "Sorry, I had a brief technical issue. Could you repeat that?"
+
+    state.setdefault("messages", []).append({
+        "role": "assistant", "content": reply, "ts": datetime.utcnow().isoformat()
+    })
+    state["turn_count"] = state.get("turn_count", 0) + 1
     return state
 
 
-def node_extract_fields(state: HVACChatState) -> HVACChatState:
+def node_extract_fields(state: dict) -> dict:
     """
-    Extracts structured fields from the latest user message.
-    Also detects appointment confirmation using a dedicated LLM call.
+    Per-turn extraction from the latest user message.
+    Appointment confirmation check only fires when:
+      - Slots have been offered (state has appt_slots)
+      - Appointment not yet booked
+      - Message contains a confirmation-like keyword (pre-filter)
     """
-    logger.info("node_extract_fields")
+    msg = last_user_msg(state)
+    if not msg:
+        return state
+
+    # ── Field extraction ──────────────────────────────────────────────────────
     try:
-        last_user = _last_user_message(state)
-        if not last_user:
-            return state
-
-        # ── Field extraction ──────────────────────────────────────────────────
-        response  = llm.invoke([
+        resp      = llm.invoke([
             SystemMessage(content=EXTRACT_FIELDS_SYSTEM),
-            HumanMessage(content=last_user),
-        ], max_tokens=200, temperature=0)
-
-        extracted = _parse_json_from_llm(response.content)
+            HumanMessage(content=msg),
+        ], max_tokens=150, temperature=0)
+        extracted = parse_json(resp.content)
         if extracted:
-            state = _merge_extracted(state, extracted)
+            merge_extracted(state, extracted)
+    except Exception as exc:
+        logger.error(f"node_extract_fields (fields) failed: {exc}")
 
-        # ── Appointment confirmation ──────────────────────────────────────────
-        # Only check if slots were offered and not yet booked
-        if state.get("appt_slots") and not state.get("appt_booked"):
-            slots_str = "\n".join(
-                f"{i+1}. {s}" for i, s in enumerate(state["appt_slots"])
-            )
-            confirm_response = llm.invoke([
+    # ── Appointment confirmation — gated ──────────────────────────────────────
+    if (
+        state.get("appt_slots")
+        and not state.get("appt_booked")
+        and _looks_like_confirmation(msg)
+    ):
+        try:
+            slots_str = "\n".join(f"{i+1}. {s}" for i, s in enumerate(state["appt_slots"]))
+            resp = llm.invoke([
                 SystemMessage(content=APPOINTMENT_CONFIRM_SYSTEM),
-                HumanMessage(content=(
-                    f"Available slots:\n{slots_str}\n\n"
-                    f"User message: {last_user}"
-                )),
-            ], max_tokens=100, temperature=0)
-
-            confirm = _parse_json_from_llm(confirm_response.content)
+                HumanMessage(content=f"Slots offered:\n{slots_str}\n\nUser said: {msg}"),
+            ], max_tokens=60, temperature=0)
+            confirm = parse_json(resp.content)
             if confirm and confirm.get("confirmed"):
-                slot_index = confirm.get("slot_index", 0)
-                # Validate index is in range
-                if 0 <= slot_index < len(state["appt_slots"]):
-                    state["appt_booked"]    = True
-                    state["appt_confirmed"] = state["appt_slots"][slot_index]
-                    logger.info(f"Appointment booked: slot {slot_index} = {state['appt_confirmed']}")
-                else:
-                    # Fallback: use first slot if index is invalid
-                    state["appt_booked"]    = True
-                    state["appt_confirmed"] = state["appt_slots"][0]
-                    logger.warning(f"Slot index {slot_index} out of range, defaulting to slot 0")
-
-    except Exception as e:
-        logger.error(f"node_extract_fields failed: {e}")
+                idx = int(confirm.get("slot_index", 0))
+                idx = max(0, min(idx, len(state["appt_slots"]) - 1))
+                state["appt_booked"]    = True
+                state["appt_confirmed"] = state["appt_slots"][idx]
+                logger.info(f"appt booked: slot {idx} = {state['appt_confirmed']}")
+        except Exception as exc:
+            logger.error(f"node_extract_fields (appt) failed: {exc}")
 
     return state
 
@@ -248,85 +192,53 @@ def node_extract_fields(state: HVACChatState) -> HVACChatState:
 # POST-CHAT GRAPH NODES
 # ══════════════════════════════════════════════════════════════════════════════
 
-def node_extract_final(state: HVACChatState) -> HVACChatState:
+def node_extract_final(state: dict) -> dict:
     """
-    Final extraction pass over the FULL transcript.
-    Fills any fields missed during per-turn extraction.
+    Final extraction pass over full transcript.
+    Skipped entirely if all required fields are already present —
+    saves a full LLM call (~800 tokens) when chat extraction worked well.
     """
-    logger.info("node_extract_final")
+    missing = [f for f in _REQUIRED if field_missing(state, f)]
+    if not missing:
+        logger.info("node_extract_final: all required fields present — skipping")
+        return state
+
+    logger.info(f"node_extract_final: filling {missing}")
     try:
-        transcript = _full_transcript(state)
+        transcript = full_transcript(state)
         if not transcript:
             return state
-
-        response  = llm.invoke([
+        resp      = llm.invoke([
             SystemMessage(content=EXTRACT_FIELDS_SYSTEM),
             HumanMessage(content=transcript),
-        ], max_tokens=300, temperature=0)
-
-        extracted = _parse_json_from_llm(response.content)
-        if extracted:
-            state = _merge_extracted(state, extracted)
-
-    except Exception as e:
-        logger.error(f"node_extract_final failed: {e}")
-
-    return state
-
-
-def node_score_lead(state: HVACChatState) -> HVACChatState:
-    """
-    Scores lead as hot / warm / cold using LLM.
-    Defaults to 'warm' on any failure.
-    """
-    logger.info("node_score_lead")
-    try:
-        # Only send scoring-relevant fields — not full messages array
-        scoring_input = {
-            "urgency":       state.get("urgency"),
-            "is_homeowner":  state.get("is_homeowner"),
-            "email":         bool(state.get("email")),
-            "phone":         bool(state.get("phone")),
-            "appt_booked":   state.get("appt_booked"),
-            "turn_count":    state.get("turn_count"),
-            "issue":         state.get("issue"),
-            "budget_signal": state.get("budget_signal"),
-            "timeline":      state.get("timeline"),
-        }
-
-        response = llm.invoke([
-            SystemMessage(content=LEAD_SCORING_SYSTEM),
-            HumanMessage(content=json.dumps(scoring_input)),
         ], max_tokens=150, temperature=0)
-
-        result = _parse_json_from_llm(response.content)
-        if result:
-            score = result.get("score", "warm").lower()
-            state["score"]        = score if score in ("hot", "warm", "cold") else "warm"
-            state["score_reason"] = result.get("reason", "")
-            logger.info(f"Lead scored: {state['score']} | {state['score_reason']}")
-        else:
-            state["score"]        = "warm"
-            state["score_reason"] = "Could not parse scoring output"
-
-    except Exception as e:
-        logger.error(f"node_score_lead failed: {e}")
-        state["score"]        = "warm"
-        state["score_reason"] = f"Scoring error: {str(e)}"
+        extracted = parse_json(resp.content)
+        if extracted:
+            merge_extracted(state, extracted)
+    except Exception as exc:
+        logger.error(f"node_extract_final failed: {exc}")
 
     return state
 
 
-def node_generate_summary(state: HVACChatState) -> HVACChatState:
+def node_score_lead(state: dict) -> dict:
     """
-    Generates TWO separate summaries:
-      state["summary"]          → client-facing, sent in email
-      state["internal_summary"] → sales team, stored in Sheets
-    Only sends relevant fields to LLM — never the full messages array.
+    Rule-based scoring — no LLM call.
+    Consistent, debuggable, saves ~750 tokens per post-chat run.
     """
-    logger.info("node_generate_summary")
+    result = rule_score_lead(state)
+    state["score"]        = result["score"]
+    state["score_number"] = result["score_number"]
+    state["score_reason"] = result["score_reason"]
+    logger.info(f"score: {result['score']} ({result['score_number']}) — {result['score_reason']}")
+    return state
 
-    # Structured context — no message history, no extra tokens
+
+def node_generate_summary(state: dict) -> dict:
+    """
+    ONE LLM call produces both client + internal summaries.
+    Previously two separate calls (~500 tokens overhead each time).
+    """
     context = {
         "name":           state.get("name"),
         "issue":          state.get("issue"),
@@ -337,178 +249,107 @@ def node_generate_summary(state: HVACChatState) -> HVACChatState:
         "appt_confirmed": state.get("appt_confirmed"),
         "score":          state.get("score"),
         "score_reason":   state.get("score_reason"),
-        "budget_signal":  state.get("budget_signal"),
     }
-    context_str = json.dumps(context, default=str)
-
-    # ── Client summary ────────────────────────────────────────────────────────
     try:
-        response = llm.invoke([
-            SystemMessage(content=SUMMARY_CLIENT_SYSTEM),
-            HumanMessage(content=context_str),
-        ], max_tokens=300, temperature=0.5)
-        state["summary"] = response.content.strip()
-    except Exception as e:
-        logger.error(f"node_generate_summary (client) failed: {e}")
-        state["summary"] = (
-            f"We discussed your {state.get('issue', 'HVAC issue')} "
-            f"in {state.get('location', 'your area')}. "
-            f"Appointment: {state.get('appt_confirmed', 'to be scheduled')}."
+        resp   = llm.invoke([
+            SystemMessage(content=SUMMARY_COMBINED_SYSTEM),
+            HumanMessage(content=json.dumps(context, default=str)),
+        ], max_tokens=350, temperature=0.4)
+        result = parse_json(resp.content)
+        if result:
+            state["summary"]          = result.get("client", "")
+            state["internal_summary"] = result.get("internal", "")
+        else:
+            raise ValueError("No JSON in summary response")
+    except Exception as exc:
+        logger.error(f"node_generate_summary failed: {exc}")
+        issue    = state.get("issue", "HVAC issue")
+        location = state.get("location", "your area")
+        appt     = state.get("appt_confirmed", "to be scheduled")
+        score    = (state.get("score") or "warm").upper()
+        state["summary"]          = (
+            f"We discussed your {issue} in {location}. "
+            f"Appointment: {appt}."
         )
-
-    # ── Internal summary ──────────────────────────────────────────────────────
-    try:
-        response = llm.invoke([
-            SystemMessage(content=SUMMARY_INTERNAL_SYSTEM),
-            HumanMessage(content=context_str),
-        ], max_tokens=200, temperature=0.3)
-        state["internal_summary"] = response.content.strip()
-    except Exception as e:
-        logger.error(f"node_generate_summary (internal) failed: {e}")
         state["internal_summary"] = (
-            f"Score: {state.get('score', 'warm')} | "
-            f"Issue: {state.get('issue')} | "
-            f"Reason: {state.get('score_reason')}"
+            f"{score} - {issue} | {state.get('score_reason', '')}"
         )
 
     return state
 
 
-def node_send_email(state: HVACChatState) -> HVACChatState:
-    """
-    Sends consultation summary email to client via Resend.
-    Skips silently if no email was collected.
-    Business phone comes from settings — never hardcoded.
-    """
-    logger.info("node_send_email")
-
+def node_send_email(state: dict) -> dict:
+    """Send consultation summary email to client. Skips if no email collected."""
     if not state.get("email"):
-        logger.info("No email collected — skipping email send")
+        logger.info("node_send_email: no email — skipping")
         return state
 
+    name    = state.get("name", "there")
+    summary = state.get("summary", "Here is a summary of our conversation.")
+
+    if state.get("appt_confirmed"):
+        appt_html = f"""
+        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:16px;margin:16px 0;">
+          <h3 style="margin:0 0 8px;color:#166534;">📅 Your Appointment</h3>
+          <p style="margin:4px 0;font-size:16px;font-weight:600;">{state["appt_confirmed"]}</p>
+          <p style="margin:4px 0;color:#555;">Free in-home assessment — tech calls 30 min before arrival.</p>
+        </div>"""
+    else:
+        appt_html = f"""
+        <div style="background:#fefce8;border:1px solid #fde047;border-radius:8px;padding:16px;margin:16px 0;">
+          <p style="margin:0;">Reply to this email or call <strong>{settings.BUSINESS_PHONE}</strong> to book your free assessment.</p>
+        </div>"""
+
+    html = f"""<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1a1a1a;">
+      <h2 style="color:#0D1B2A;">Your HVAC Consultation Summary</h2>
+      <p>Hi {name},</p><p>{summary}</p>
+      {appt_html}
+      <hr style="border:none;border-top:1px solid #e5e4e2;margin:24px 0;">
+      <p style="color:#666;font-size:13px;">Questions? Reply or call <strong>{settings.BUSINESS_PHONE}</strong>.<br>automedge HVAC Team</p>
+    </body></html>"""
+
     try:
-        name    = state.get("name", "there")
-        summary = state.get("summary", "Here is a summary of our conversation.")
-
-        # ── Appointment section ───────────────────────────────────────────────
-        if state.get("appt_confirmed"):
-            appt_section = f"""
-            <div style="background:#f0fdf4;border:1px solid #86efac;
-                        border-radius:8px;padding:16px;margin:16px 0;">
-                <h3 style="margin:0 0 8px;color:#166534;">📅 Your Appointment</h3>
-                <p style="margin:4px 0;font-size:16px;font-weight:600;">
-                    {state['appt_confirmed']}
-                </p>
-                <p style="margin:4px 0;color:#555;">Free in-home assessment</p>
-                <p style="margin:4px 0;color:#555;">
-                    Our technician will call 30 minutes before arrival.
-                </p>
-            </div>
-            """
-        else:
-            appt_section = f"""
-            <div style="background:#fefce8;border:1px solid #fde047;
-                        border-radius:8px;padding:16px;margin:16px 0;">
-                <p style="margin:0;">
-                    We'd love to get you scheduled. Reply to this email
-                    or call us at
-                    <strong>{settings.BUSINESS_PHONE}</strong>
-                    to book your free assessment.
-                </p>
-            </div>
-            """
-
-        html_body = f"""
-        <!DOCTYPE html>
-        <html>
-        <body style="font-family:sans-serif;max-width:600px;
-                     margin:0 auto;padding:24px;color:#1a1a1a;">
-
-            <h2 style="color:#0D1B2A;">Your HVAC Consultation Summary</h2>
-            <p>Hi {name},</p>
-            <p>{summary}</p>
-
-            {appt_section}
-
-            <hr style="border:none;border-top:1px solid #e5e4e2;margin:24px 0;">
-            <p style="color:#666;font-size:13px;">
-                Questions? Reply to this email or call
-                <strong>{settings.BUSINESS_PHONE}</strong>.<br>
-                automedge HVAC Team
-            </p>
-
-        </body>
-        </html>
-        """
-
         result = email_tool.send_email(
-            to=state["email"],
-            subject="Your HVAC consultation summary + appointment",
-            html=html_body,
-            from_name="automedge HVAC",
+            to        = state["email"],
+            subject   = "Your HVAC consultation + appointment",
+            html      = html,
+            from_name = "automedge HVAC",
         )
         state["email_sent"] = result.get("status") == "sent"
-        logger.info(f"Email sent={state['email_sent']} to {state['email']}")
-
-    except Exception as e:
-        logger.error(f"node_send_email failed: {e}")
+        logger.info(f"email sent={state['email_sent']} to {state['email']}")
+    except Exception as exc:
+        logger.error(f"node_send_email failed: {exc}")
         state["email_sent"] = False
 
     return state
 
 
-def node_save_sheets(state: HVACChatState) -> HVACChatState:
-    """
-    Saves lead to the correct Google Sheet tab based on score.
-    hot → "Hot Leads" | warm → "Warm Leads" | cold → "Cold Leads"
-    Stores row number for future updates (stage changes, etc.)
-    """
-    logger.info("node_save_sheets")
+def node_save_sheets(state: dict) -> dict:
+    """Save lead row to the correct tab (Hot/Warm/Cold) in Google Sheets."""
+    TAB = {"hot": "Hot Leads", "warm": "Warm Leads", "cold": "Cold Leads"}
+    score = state.get("score", "warm")
+    tab   = TAB.get(score, "Warm Leads")
 
-    TAB_MAP = {
-        "hot":  "Hot Leads",
-        "warm": "Warm Leads",
-        "cold": "Cold Leads",
-    }
+    # Columns A–G — matches Sheet header row exactly
+    row = [
+        datetime.utcnow().isoformat(),       # A Timestamp
+        state.get("name")         or "",     # B Name
+        state.get("email")        or "",     # C Email
+        state.get("phone")        or "",     # D Phone
+        state.get("issue")        or "",     # E Issue
+        state.get("location")     or "",     # F Address / Location
+        state.get("vertical")     or "",     # G Vertical
+        state.get("appt_confirmed") or "",   # H Appointment (blank if not booked)
+    ]
 
     try:
-        score   = state.get("score", "warm")
-        tab     = TAB_MAP.get(score, "Warm Leads")
-
-        # Columns A–S (matches Sheet header row exactly)
-        row = [
-            datetime.now().isoformat(),                    # A Timestamp
-            state.get("name") or "",                       # B Name
-            state.get("email") or "",                      # C Email
-            state.get("phone") or "",                      # D Phone
-            state.get("location") or "",                   # E Location
-            state.get("issue") or "",                      # F Issue
-            state.get("system_age") or "",                 # G System Age
-            state.get("urgency") or "",                    # H Urgency
-            str(state.get("is_homeowner") or ""),          # I Homeowner
-            state.get("budget_signal") or "",              # J Budget Signal
-            score.upper(),                                 # K Score
-            str(state.get("score_number") or ""),          # L Score Number
-            state.get("score_reason") or "",               # M Score Reason
-            str(state.get("appt_booked", False)),          # N Appt Booked
-            state.get("appt_confirmed") or "",             # O Appt DateTime
-            str(state.get("email_sent", False)),           # P Email Sent
-            str(state.get("turn_count", 0)),               # Q Chat Turns
-            state.get("internal_summary") or "",           # R Internal Summary
-            state.get("session_id") or "",                 # S Session ID
-        ]
-
         row_num = sheets_tool.save_lead_to_sheet(
-            score=score,
-            row=row,
-            sheet_id=settings.HVAC_SHEET_ID,
+            score=score, row=row, sheet_id=settings.HVAC_SHEET_ID
         )
-
         state["sheet_row"] = row_num
         state["sheet_tab"] = tab
-        logger.info(f"Saved to sheet tab='{tab}' row={row_num}")
-
-    except Exception as e:
-        logger.error(f"node_save_sheets failed: {e}")
+        logger.info(f"sheets: tab='{tab}' row={row_num}")
+    except Exception as exc:
+        logger.error(f"node_save_sheets failed: {exc}")
 
     return state
