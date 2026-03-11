@@ -9,6 +9,7 @@ services:
     region: oregon
     plan: free
     branch: main
+    rootDir: backend # ← tells Render to treat backend/ as the working directory
 
     buildCommand: pip install -r requirements.txt
 
