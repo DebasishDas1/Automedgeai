@@ -29,7 +29,6 @@ class StartRequest(BaseModel):
 class StartResponse(BaseModel):
     session_id: str
     vertical:   Vertical
-    message:    str   # AI opening greeting
     turn:       int = 0
 
 
@@ -68,7 +67,6 @@ async def handle_start(vertical: Vertical, body: StartRequest, db) -> StartRespo
     return StartResponse(
         session_id = result["session_id"],
         vertical   = vertical,
-        message    = result["message"],
         turn       = result["turn"],
     )
 

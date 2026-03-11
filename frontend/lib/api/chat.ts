@@ -1,66 +1,34 @@
-// front end
-
 // lib/api/chat.ts
-
-const getApiBase = () => process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API = () => process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface StartChatResponse {
-    session_id: string;
-    vertical: string;
-    message: string;
-    turn: number;
+  session_id: string;
+  vertical: string;
+  // message: string;
+  turn: number;
 }
 
 export interface SendMessageResponse {
-    session_id: string;
-    message: string;
-    turn: number;
-    is_complete: boolean;
-    appt_booked: boolean;
-    fields_collected: Record<string, any>;
+  session_id: string;
+  message: string;
+  turn: number;
+  is_complete: boolean;
+  appt_booked: boolean;
+  fields_collected: Record<string, unknown>;
 }
 
-export async function startChatSession(
-  vertical: string,
-  source: string = 'web_chat'
-): Promise<StartChatResponse> {
-
-  const apiBase = getApiBase()
-
-  const res = await fetch(`${apiBase}/api/v1/chat/${vertical}/start`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ source })
-  })
-
-  if (!res.ok) {
-    throw new Error(`Failed to start chat: ${res.statusText}`)
-  }
-
-  return res.json()
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API()}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
 }
 
+export const startChatSession = (vertical: string, source = "web_chat") =>
+  post<StartChatResponse>(`/api/v1/chat/${vertical}/start`, { source });
 
-export async function sendChatMessage(
-  vertical: string,
-  sessionId: string,
-  message: string
-): Promise<SendMessageResponse> {
-
-  const apiBase = getApiBase()
-
-  const res = await fetch(`${apiBase}/api/v1/chat/${vertical}/message`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      session_id: sessionId,
-      message
-    })
-  })
-
-  if (!res.ok) {
-    throw new Error(`Failed to send message: ${res.statusText}`)
-  }
-
-  return res.json()
-}
+export const sendChatMessage = (vertical: string, session_id: string, message: string) =>
+  post<SendMessageResponse>(`/api/v1/chat/${vertical}/message`, { session_id, message });

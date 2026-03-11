@@ -8,7 +8,7 @@ router = APIRouter()
 router.include_router(leads.router,    prefix="/leads",    tags=["leads"])
 router.include_router(workflow.router, prefix="/workflow",  tags=["workflow"])
 router.include_router(bookings.router, prefix="/bookings", tags=["bookings"])
-router.include_router(chat_router,     prefix="/chat",     tags=["chat"])   # ← prefix required
+router.include_router(chat_router,     prefix="/chat")   # ← prefix required
 
 # POST  /api/v1/chat/hvac/start
 # POST  /api/v1/chat/hvac/message

@@ -1,20 +1,15 @@
-import os
 import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 import uuid
-from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from contextlib import asynccontextmanager
-
-load_dotenv()
-
-DATABASE_URL = os.getenv("DATABASE_URL")
+from core.config import settings
 
 engine = create_async_engine(
-    DATABASE_URL,
+    settings.DATABASE_URL,
     echo=False,
     pool_pre_ping=True,
     connect_args={"ssl": True}

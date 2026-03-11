@@ -91,10 +91,6 @@ services:
       - key: PEST_SHEET_ID
         sync: false
 
-      # ── OpenAI ─────────────────────────────────────────────────────────
-      - key: OPENAI_API_KEY
-        sync: false
-
       # ── Groq (fallback if OpenAI not set) ─────────────────────────────
       - key: GROQ_API_KEY
         sync: false

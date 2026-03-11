@@ -94,27 +94,18 @@ async def start_session(
     await db.commit()
     await db.refresh(row)
 
-    # Turn 0 — AI sends opening greeting
-    result = _CHAT_GRAPHS[vertical].invoke(initial_state)
-    await _save_session(db, row, result)
-
-    messages = result.get("messages", [])
-    last_ai  = next(
-        (m["content"] for m in reversed(messages) if m.get("role") == "assistant"), ""
-    )
     logger.info(f"Session started: {session_id} vertical={vertical}")
     return {
         "session_id": session_id,
         "vertical":   vertical,
-        "message":    last_ai,
-        "turn":       result.get("turn_count", 0),
+        "turn": 0,
     }
 
 
 async def send_message(
-    db:         AsyncSession,
+    db: AsyncSession,
     session_id: str,
-    user_msg:   str,
+    user_msg: str,
 ) -> dict:
     row = await _load_session(db, session_id)
     if row is None:
@@ -123,40 +114,78 @@ async def send_message(
         raise ValueError(f"Session already complete: {session_id}")
 
     vertical = row.vertical
-    state    = dict(row.state)   # JSONB → dict
+    state = dict(row.state)
 
-    # Append user message
+    msg = user_msg.strip().lower()
+
+    # ── Fast path (no LLM) ─────────────────────
+
+    # simple greeting detection
+    if msg in {"hi", "hello", "hey"} and state.get("turn_count", 0) > 0:
+        return {
+            "session_id": session_id,
+            "message": "Hello again! How can I help with your issue?",
+            "turn": state.get("turn_count", 0),
+            "is_complete": False,
+            "appt_booked": False,
+            "fields_collected": {},
+        }
+
+    # detect phone number
+    if "phone" not in state and any(c.isdigit() for c in msg) and len(msg) >= 10:
+        state["phone"] = msg
+        state.setdefault("messages", []).append({
+            "role": "user",
+            "content": user_msg,
+            "ts": datetime.utcnow().isoformat(),
+        })
+        state["turn_count"] = state.get("turn_count", 0) + 1
+
+        await _save_session(db, row, state)
+
+        return {
+            "session_id": session_id,
+            "message": "Got it 👍 What's your city?",
+            "turn": state["turn_count"],
+            "is_complete": False,
+            "appt_booked": False,
+            "fields_collected": {"phone": msg},
+        }
+
+    # ── Default: run LangGraph ─────────────────
+
     state.setdefault("messages", []).append({
-        "role":    "user",
+        "role": "user",
         "content": user_msg,
-        "ts":      datetime.utcnow().isoformat(),
+        "ts": datetime.utcnow().isoformat(),
     })
 
     result = _CHAT_GRAPHS[vertical].invoke(state)
     result["_vertical"] = vertical
+
     await _save_session(db, row, result)
 
     messages = result.get("messages", [])
-    last_ai  = next(
-        (m["content"] for m in reversed(messages) if m.get("role") == "assistant"), ""
+    last_ai = next(
+        (m["content"] for m in reversed(messages) if m.get("role") == "assistant"),
+        "",
     )
+
     fields_collected = {
         k: result[k] for k in _COLLECTIBLE_FIELDS if result.get(k) is not None
     }
-    logger.info(
-        f"turn={result.get('turn_count')} session={session_id} "
-        f"complete={result.get('is_complete')}"
-    )
+
     return {
-        "session_id":       session_id,
-        "message":          last_ai,
-        "turn":             result.get("turn_count", 0),
-        "is_complete":      bool(result.get("is_complete")),
-        "appt_booked":      bool(result.get("appt_booked")),
+        "session_id": session_id,
+        "message": last_ai,
+        "turn": result.get("turn_count", 0),
+        "is_complete": bool(result.get("is_complete")),
+        "appt_booked": bool(result.get("appt_booked")),
         "fields_collected": fields_collected,
-        "_state":           result,
-        "_vertical":        vertical,
+        "_state": result,
+        "_vertical": vertical,
     }
+
 
 
 async def run_post_chat(state: dict, vertical: str) -> None:
