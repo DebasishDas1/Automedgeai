@@ -9,7 +9,7 @@ services:
     region: oregon
     plan: free
     branch: main
-    rootDir: backend # ← tells Render to treat backend/ as the working directory
+    rootDir: backend
 
     buildCommand: pip install -r requirements.txt
 
@@ -17,32 +17,31 @@ services:
       uvicorn main:app
       --host 0.0.0.0
       --port $PORT
-      --workers 2
       --timeout-keep-alive 120
-      --log-level info
 
     healthCheckPath: /healthz
     autoDeploy: true
 
     envVars:
-      # ── Runtime ────────────────────────────────────────────────────────
+      # Runtime
       - key: ENVIRONMENT
         value: prod
 
       - key: PYTHON_VERSION
         value: "3.12.9"
 
-      # ── Database ────────────────────────────────────────────────────────
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+      # Database
       - key: DATABASE_URL
         sync: false
 
-      # ── Firebase ────────────────────────────────────────────────────────
-      # Paste full JSON string from your Firebase service account file
+      # Firebase
       - key: FIREBASE_CREDENTIALS_JSON
         sync: false
 
-      # ── Google Sheets ────────────────────────────────────────────────────
-      # Paste full JSON string from your Sheets service account file
+      # Google Sheets
       - key: SHEETS_CREDENTIALS_JSON
         sync: false
 
@@ -58,19 +57,18 @@ services:
       - key: PEST_SHEET_ID
         sync: false
 
-      # ── LLM ────────────────────────────────────────────────────────────
-      # Set at least one. Groq is free tier — good for production fallback.
+      # LLM
       - key: GROQ_API_KEY
         sync: false
 
-      # ── Resend ────────────────────────────────────────────────────────
+      # Email
       - key: RESEND_API_KEY
         sync: false
 
       - key: EMAIL_FROM
-        sync: false # e.g. hello@automedge.com (must be verified in Resend)
+        sync: false
 
-      # ── Twilio ────────────────────────────────────────────────────────
+      # Twilio
       - key: TWILIO_ACCOUNT_SID
         sync: false
 
@@ -80,13 +78,13 @@ services:
       - key: TWILIO_FROM_NUMBER
         sync: false
 
-      # ── Business ──────────────────────────────────────────────────────
+      # Business
       - key: BUSINESS_PHONE
         value: "+1-555-000-0000"
 
       - key: TEAM_EMAIL
         value: "team@automedge.com"
 
-      # ── CORS ──────────────────────────────────────────────────────────
+      # CORS
       - key: ALLOWED_ORIGINS
         value: "https://your-frontend.onrender.com,http://localhost:3000"
