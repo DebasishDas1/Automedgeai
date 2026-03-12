@@ -36,14 +36,14 @@ class Settings(BaseSettings):
     MAX_TOKEN:      int = 1024
 
     # CORS — accepts comma string ("a.com,b.com") or JSON array
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
+    ALLOWED_ORIGINS: str | list[str] = "http://localhost:3000"
 
     @field_validator("ALLOWED_ORIGINS", mode="before")
     @classmethod
-    def split_origins(cls, v: object) -> list[str]:
+    def split_origins(cls, v):
         if isinstance(v, str):
             return [i.strip() for i in v.split(",") if i.strip()]
-        return v  # type: ignore[return-value]
+        return v
 
     ENVIRONMENT: str = "dev"
 
