@@ -19,7 +19,7 @@ services:
       --port $PORT
       --timeout-keep-alive 120
 
-    healthCheckPath: /healthz
+    healthCheckPath: /health
     autoDeploy: true
 
     envVars:

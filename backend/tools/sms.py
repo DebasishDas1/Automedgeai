@@ -5,7 +5,7 @@ logger = logging.getLogger(__name__)
 
 class SMSTool:
     def send_sms(self, to: str, body: str) -> dict:
-        if settings.ENVIRONMENT != "production":
+        if settings.ENVIRONMENT != "prod":
             logger.info(f"[MOCK SMS] to={to}\n{body}")
             return {"sid": "mock_sid", "status": "sent"}
 
