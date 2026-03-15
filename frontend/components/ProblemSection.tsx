@@ -1,16 +1,41 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Clock, MessageSquareOff, EyeOff, UserX, Users, TrendingDown } from "lucide-react";
+import {
+  Clock,
+  MessageSquareOff,
+  EyeOff,
+  UserX,
+  Users,
+  TrendingDown,
+} from "lucide-react";
 
 const PROBLEMS = [
-  { icon: <Clock className="w-6 h-6" />, text: "Slow follow-ups costing you deals" },
-  { icon: <MessageSquareOff className="w-6 h-6" />, text: "Missed WhatsApp and website inquiries" },
-  { icon: <EyeOff className="w-6 h-6" />, text: "No lead tracking or pipeline visibility" },
-  { icon: <UserX className="w-6 h-6" />, text: "Receptionists forgetting callbacks" },
-  { icon: <Users className="w-6 h-6" />, text: "Leads contacting competitors first" },
-  { icon: <TrendingDown className="w-6 h-6" />, text: "No structured nurturing system" },
+  {
+    icon: <Clock className="w-6 h-6" />,
+    text: "Slow follow-ups costing you deals",
+  },
+  {
+    icon: <MessageSquareOff className="w-6 h-6" />,
+    text: "Missed WhatsApp and website inquiries",
+  },
+  {
+    icon: <EyeOff className="w-6 h-6" />,
+    text: "No lead tracking or pipeline visibility",
+  },
+  {
+    icon: <UserX className="w-6 h-6" />,
+    text: "Receptionists forgetting callbacks",
+  },
+  {
+    icon: <Users className="w-6 h-6" />,
+    text: "Leads contacting competitors first",
+  },
+  {
+    icon: <TrendingDown className="w-6 h-6" />,
+    text: "No structured nurturing system",
+  },
 ];
 
 export function ProblemSection() {

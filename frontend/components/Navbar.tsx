@@ -1,62 +1,62 @@
 import Link from "next/link";
-import { MessageCircle } from "lucide-react";
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
+
+const navItems = [
+  { title: "The Problem", href: "#problem" },
+  { title: "How It Works", href: "#how-it-works" },
+  { title: "The Solution", href: "#solution" },
+  { title: "Impact", href: "#impact" },
+];
 
 export function Navbar() {
   return (
-    <nav className="fixed top-0 w-full z-50 px-6 py-4 flex items-center justify-between border-b border-border/10 bg-background/80 backdrop-blur-md">
-      <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center">
-          <div className="w-4 h-4 rounded-full border-2 border-background"></div>
+    <nav className="fixed top-0 z-50 w-full bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+        {/* Logo */}
+        <Link
+          href="/"
+          className="relative flex items-center w-[140px] h-[40px]"
+        >
+          {/* Light Mode Logo */}
+          <Image
+            src="/AutomEdge-logo-light.png"
+            alt="AutomEdge logo"
+            fill
+            sizes="140px"
+            priority
+            className="object-contain dark:hidden select-none pointer-events-none"
+          />
+
+          {/* Dark Mode Logo */}
+          <Image
+            src="/AutomEdge-logo.png"
+            alt="AutomEdge logo"
+            fill
+            sizes="140px"
+            priority
+            className="object-contain hidden dark:block select-none pointer-events-none"
+          />
+        </Link>
+
+        {/* Desktop Navigation */}
+        <div className="hidden lg:flex items-center gap-8 font-black">
+          {navItems.map((item) => (
+            <Link
+              key={item.title}
+              href={item.href}
+              className="hover:text-accent transition-colors py-4"
+            >
+              {item.title}
+            </Link>
+          ))}
         </div>
-        <span className="font-outfit font-[800] text-xl tracking-tighter">
-          AUTOMEDGE
-        </span>
-      </div>
 
-      <div className="hidden lg:flex items-center gap-8 font-sans font-black tracking-[0.25em]">
-        <Link
-          href="#problem"
-          className="hover:text-accent transition-colors py-4"
-        >
-          The Problem
-        </Link>
-        <Link
-          href="#solution"
-          className="hover:text-accent transition-colors py-4"
-        >
-          The Solution
-        </Link>
-        <Link
-          href="#impact"
-          className="hover:text-accent transition-colors py-4"
-        >
-          Impact
-        </Link>
-        <Link href="#faq" className="hover:text-accent transition-colors py-4">
-          Frequently Asked Questions
-        </Link>
-        <Link
-          href="#contact"
-          className="hover:text-accent transition-colors py-4"
-        >
-          Contact Us
-        </Link>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <a
-          href="https://wa.me/9830561158"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hidden sm:flex items-center gap-2 px-4 py-2 border border-border rounded-full hover:bg-muted transition-colors text-[10px] font-sans font-black"
-        >
-          <MessageCircle />
-          WhatsApp Us
-        </a>
+        {/* CTA */}
         <Link href="#contact">
-          <button className="px-6 py-2 bg-primary text-primary-foreground rounded-full text-[10px] font-sans font-black hover:opacity-90 transition-opacity tracking-widest">
+          <Button className="bg-cta px-4 py-2 rounded-full font-semibold">
             Get a Free Demo
-          </button>
+          </Button>
         </Link>
       </div>
     </nav>

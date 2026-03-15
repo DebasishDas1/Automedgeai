@@ -29,12 +29,11 @@ export default function HvacLandingPage() {
 
       <HvacFooter />
       <Chatbot vertical="hvac" accentColor="#00C2A8" />
-
       {/* Smooth background decoration */}
-      <div className="fixed top-0 left-0 w-full h-full pointer-events-none -z-10">
+      {/* <div className="fixed top-0 left-0 w-full h-full pointer-events-none -z-10">
         <div className="absolute top-[20%] -left-[10%] w-[400px] h-[400px] bg-[#00C2A8]/5 rounded-full blur-[120px]"></div>
         <div className="absolute bottom-[20%] -right-[10%] w-[500px] h-[500px] bg-orange-500/5 dark:bg-orange-950/10 rounded-full blur-[150px]"></div>
-      </div>
+      </div> */}
     </main>
   );
 }

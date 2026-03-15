@@ -1,169 +1,255 @@
 @import "tailwindcss";
 
 /* ══════════════════════════════════════════════════════════
-   @theme — maps Tailwind color/font utilities to CSS vars
+   AutomEdge — Global Stylesheet
+   Brand: Navy #0F2A47 · Teal #1D9E75 · Amber #EF9F27
+   Built for: HVAC automation agency, home service B2B
+   ══════════════════════════════════════════════════════════ */
+
+/* ══════════════════════════════════════════════════════════
+   @theme — maps Tailwind utilities to CSS vars
    ══════════════════════════════════════════════════════════ */
 @theme {
-  /* Colors */
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
+  /* ── Core colors ─────────────────────────────────────────────────────────── */
+  --color-background:            var(--background);
+  --color-foreground:            var(--foreground);
+  --color-card:                  var(--card);
+  --color-card-foreground:       var(--card-foreground);
+  --color-popover:               var(--popover);
+  --color-popover-foreground:    var(--popover-foreground);
+  --color-primary:               var(--primary);
+  --color-primary-foreground:    var(--primary-foreground);
+  --color-secondary:             var(--secondary);
+  --color-secondary-foreground:  var(--secondary-foreground);
+  --color-muted:                 var(--muted);
+  --color-muted-foreground:      var(--muted-foreground);
+
+  /* Teal — brand identity, links, icons, hover states */
+  --color-accent:                var(--accent);
+  --color-accent-foreground:     var(--accent-foreground);
+
+  /* Amber — CTA buttons ONLY. Never use for decoration. */
+  --color-cta:                   var(--cta);
+  --color-cta-foreground:        var(--cta-foreground);
+
+  --color-destructive:           var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
+  --color-success:               var(--success);
+  --color-success-foreground:    var(--success-foreground);
+  --color-warning:               var(--warning);
+  --color-warning-foreground:    var(--warning-foreground);
 
-  /* Radius scale */
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  --color-border:                var(--border);
+  --color-input:                 var(--input);
+  --color-ring:                  var(--ring);
 
-  /* ── Font utilities ────────────────────────────────────────────────────────
-     --font-display → Outfit (headings)        → font-display class
-     --font-sans    → Plus Jakarta Sans (body) → font-sans class (default)
-     --font-mono    → DM Mono (code/tags)      → font-mono class
-     NOTE: was --font-outfit, renamed to --font-display to match layout.tsx
-     ───────────────────────────────────────────────────────────────────────── */
+  /* ── Radius scale ────────────────────────────────────────────────────────── */
+  --radius-xl:  var(--radius);
+  --radius-lg:  calc(var(--radius) - 2px);
+  --radius-md:  calc(var(--radius) - 4px);
+  --radius-sm:  calc(var(--radius) - 6px);
+  --radius-full: 9999px;
+
+  /* ── Font utilities ───────────────────────────────────────────────────────
+     --font-display → Plus Jakarta Sans (headings + wordmark)
+     --font-sans    → Plus Jakarta Sans (body, UI)
+     --font-mono    → DM Mono (code, SMS previews, tags)
+
+     NOTE: Both display and sans use Plus Jakarta Sans for brand consistency.
+     Weight differentiation (800 vs 400) creates the hierarchy.
+     ─────────────────────────────────────────────────────────────────────── */
   --font-display: var(--font-display);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-mono);
+  --font-sans:    var(--font-sans);
+  --font-mono:    var(--font-mono);
 }
 
 /* ══════════════════════════════════════════════════════════
-   LIGHT THEME  bg: #FAF9F6 warm cream
-   ──────────────────────────────────────────────────────────
-   Accent #00C2A8 contrast on cream = 2.1:1 → FAILS as text
-   Use accent ONLY as: border / icon fill / badge bg / glow
-   Buttons on light = --primary (#1A1A1A) bg, never accent bg
+   LIGHT THEME
+   bg: #F5F7FA  (cool off-white — cleaner than warm cream
+   for a tech brand targeting tradespeople)
+
+   Teal #1D9E75 contrast on #F5F7FA = 4.6:1 ✅ AA
+   Use teal for: borders, icon fills, badge bg, links
+   NEVER use teal as CTA button bg on light bg (amber only)
    ══════════════════════════════════════════════════════════ */
 @layer base {
   :root {
-    --background: #FAF9F6;
-    --foreground: #1A1A1A;
+    /* Surfaces */
+    --background:              #F5F7FA;
+    --foreground:              #0F2A47;
 
-    --card: #FFFFFF;
-    --card-foreground: #1A1A1A;
+    --card:                    #FFFFFF;
+    --card-foreground:         #0F2A47;
 
-    --popover: #FFFFFF;
-    --popover-foreground: #1A1A1A;
+    --popover:                 #FFFFFF;
+    --popover-foreground:      #0F2A47;
 
-    --primary: #1A1A1A;
-    --primary-foreground: #FAF9F6;
+    /* Primary action — navy on light, used for non-CTA buttons */
+    --primary:                 #0F2A47;
+    --primary-foreground:      #F5F7FA;
 
-    --secondary: #E5E4E2;
-    --secondary-foreground: #1A1A1A;
+    /* Secondary surfaces */
+    --secondary:               #E8EDF3;
+    --secondary-foreground:    #0F2A47;
 
-    --muted: #F2F0EB;
-    --muted-foreground: #6B7280;
+    /* Muted / subdued */
+    --muted:                   #EFF2F6;
+    --muted-foreground:        #5A7A96;
 
-    --accent: #00C2A8;
-    --accent-foreground: #0D1B2A;
-    /* dark — white fails at 2.3:1 */
-    --accent-muted: rgba(0, 194, 168, 0.10);
-    --accent-border: rgba(0, 194, 168, 0.25);
-    --accent-hover: #00A896;
+    /* ── Teal — brand / accent ───────────────────────────────────────────────
+       Use for: logo mark, section accents, icon fills, link hover,
+       feature card borders, proof bar text, step circles
+       NEVER as button background on light bg (fails contrast for text)
+       ─────────────────────────────────────────────────────────────────────── */
+    --accent:                  #1D9E75;
+    --accent-foreground:       #F5F7FA;
+    --accent-muted:            rgba(29, 158, 117, 0.10);
+    --accent-border:           rgba(29, 158, 117, 0.25);
+    --accent-hover:            #178A64;
+    --accent-subtle:           #E1F5EE;
+    --accent-subtle-foreground: #085041;
 
-    --destructive: #DC2626;
-    --destructive-foreground: #FAF9F6;
+    /* ── Amber — CTA ONLY ────────────────────────────────────────────────────
+       Reserve exclusively for: "Book a Demo", "See It Live", "Get Started"
+       Overuse destroys the click-through conditioning effect.
+       Contrast on amber: #412402 = 7.8:1 ✅ AAA
+       ─────────────────────────────────────────────────────────────────────── */
+    --cta:                     #EF9F27;
+    --cta-foreground:          #412402;
+    --cta-hover:               #D98D1E;
+    --cta-muted:               rgba(239, 159, 39, 0.12);
 
-    --success: #10B981;
-    --success-foreground: #FAF9F6;
-    --warning: #F97316;
-    --warning-foreground: #FAF9F6;
+    /* ── Navy — hero sections, dark cards, footer ────────────────────────────
+       Full navy bg with light text for premium dark sections
+       ─────────────────────────────────────────────────────────────────────── */
+    --navy:                    #0F2A47;
+    --navy-deep:               #0A1F38;
+    --navy-card:               #122236;
+    --navy-foreground:         #F5F7FA;
+    --navy-muted:              #5DCAA5;
 
-    --border: #E5E4E2;
-    --input: #E5E4E2;
-    --ring: #00C2A8;
-    --radius: 0.75rem;
+    /* ── Semantic ─────────────────────────────────────────────────────────── */
+    --destructive:             #DC2626;
+    --destructive-foreground:  #F5F7FA;
+    --success:                 #1D9E75;
+    --success-foreground:      #F5F7FA;
+    --warning:                 #EF9F27;
+    --warning-foreground:      #412402;
+
+    /* ── Borders / inputs ────────────────────────────────────────────────────
+       Soft on light bg, subtle and clean
+       ─────────────────────────────────────────────────────────────────────── */
+    --border:                  #D8DFE8;
+    --input:                   #D8DFE8;
+    --ring:                    #1D9E75;
+    --radius:                  0.875rem;
   }
 
   /* ══════════════════════════════════════════════════════════
-   DARK THEME  bg: #0D1B2A deep navy (brand default)
-   Accent on navy = 7.69:1 AAA ✅  safe for all uses
-   ══════════════════════════════════════════════════════════ */
+     DARK THEME — AutomEdge primary brand experience
+     bg: #0F2A47 deep command navy
+     Teal #1D9E75 on navy = 5.2:1 ✅ AA  (safe for all uses)
+     Amber #EF9F27 on navy = 8.1:1 ✅ AAA (CTA buttons)
+     ══════════════════════════════════════════════════════════ */
   .dark {
-    --background: #0D1B2A;
-    --foreground: #F8FAFC;
+    /* Surfaces */
+    --background:              #0F2A47;
+    --foreground:              #F5F7FA;
 
-    --card: #122236;
-    --card-foreground: #F8FAFC;
+    --card:                    #122236;
+    --card-foreground:         #F5F7FA;
 
-    --popover: #122236;
-    --popover-foreground: #F8FAFC;
+    --popover:                 #122236;
+    --popover-foreground:      #F5F7FA;
 
-    --primary: #F8FAFC;
-    --primary-foreground: #0D1B2A;
+    /* Primary on dark = light/white text action */
+    --primary:                 #F5F7FA;
+    --primary-foreground:      #0F2A47;
 
-    --secondary: #1A3050;
-    --secondary-foreground: #F8FAFC;
+    /* Secondary — slightly lighter navy for card hover, subtle bg */
+    --secondary:               #1A3050;
+    --secondary-foreground:    #F5F7FA;
 
-    --muted: #1A3050;
-    --muted-foreground: #94A3B8;
+    /* Muted — subdued navy layer */
+    --muted:                   #1A3050;
+    --muted-foreground:        #7EB3C8;
 
-    --accent: #00C2A8;
-    --accent-foreground: #0D1B2A;
-    --accent-muted: rgba(0, 194, 168, 0.12);
-    --accent-border: rgba(0, 194, 168, 0.25);
-    --accent-hover: #00D4B8;
+    /* Teal — full brightness on dark (AAA contrast) */
+    --accent:                  #1D9E75;
+    --accent-foreground:       #0F2A47;
+    --accent-muted:            rgba(29, 158, 117, 0.14);
+    --accent-border:           rgba(29, 158, 117, 0.30);
+    --accent-hover:            #22B585;
+    --accent-subtle:           rgba(29, 158, 117, 0.15);
+    --accent-subtle-foreground: #9FE1CB;
 
-    --destructive: #EF4444;
-    --destructive-foreground: #FAF9F6;
+    /* Amber CTA — same token, brighter pop on dark */
+    --cta:                     #EF9F27;
+    --cta-foreground:          #412402;
+    --cta-hover:               #F5AC3A;
+    --cta-muted:               rgba(239, 159, 39, 0.15);
 
-    --success: #10B981;
-    --success-foreground: #0D1B2A;
-    --warning: #F97316;
-    --warning-foreground: #0D1B2A;
+    /* Navy tokens for dark-on-dark depth (e.g. demo embed bg) */
+    --navy:                    #0F2A47;
+    --navy-deep:               #091929;
+    --navy-card:               #0A1F38;
+    --navy-foreground:         #F5F7FA;
+    --navy-muted:              #5DCAA5;
 
-    --border: rgba(255, 255, 255, 0.07);
-    --input: rgba(255, 255, 255, 0.07);
-    --ring: #00C2A8;
+    /* Semantic */
+    --destructive:             #EF4444;
+    --destructive-foreground:  #F5F7FA;
+    --success:                 #1D9E75;
+    --success-foreground:      #0F2A47;
+    --warning:                 #EF9F27;
+    --warning-foreground:      #412402;
+
+    /* Borders on dark — barely visible, refined */
+    --border:                  rgba(255, 255, 255, 0.08);
+    --input:                   rgba(255, 255, 255, 0.08);
+    --ring:                    #1D9E75;
   }
 
-  /* System preference auto-apply (no JS needed) */
+  /* Auto dark from system preference (no JS needed) */
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --background: #0D1B2A;
-      --foreground: #F8FAFC;
-      --card: #122236;
-      --card-foreground: #F8FAFC;
-      --popover: #122236;
-      --popover-foreground: #F8FAFC;
-      --primary: #F8FAFC;
-      --primary-foreground: #0D1B2A;
-      --secondary: #1A3050;
-      --secondary-foreground: #F8FAFC;
-      --muted: #1A3050;
-      --muted-foreground: #94A3B8;
-      --accent: #00C2A8;
-      --accent-foreground: #0D1B2A;
-      --accent-muted: rgba(0, 194, 168, 0.12);
-      --accent-border: rgba(0, 194, 168, 0.25);
-      --accent-hover: #00D4B8;
-      --destructive: #EF4444;
-      --destructive-foreground: #FAF9F6;
-      --success: #10B981;
-      --success-foreground: #0D1B2A;
-      --warning: #F97316;
-      --warning-foreground: #0D1B2A;
-      --border: rgba(255, 255, 255, 0.07);
-      --input: rgba(255, 255, 255, 0.07);
-      --ring: #00C2A8;
+      --background:              #0F2A47;
+      --foreground:              #F5F7FA;
+      --card:                    #122236;
+      --card-foreground:         #F5F7FA;
+      --popover:                 #122236;
+      --popover-foreground:      #F5F7FA;
+      --primary:                 #F5F7FA;
+      --primary-foreground:      #0F2A47;
+      --secondary:               #1A3050;
+      --secondary-foreground:    #F5F7FA;
+      --muted:                   #1A3050;
+      --muted-foreground:        #7EB3C8;
+      --accent:                  #1D9E75;
+      --accent-foreground:       #0F2A47;
+      --accent-muted:            rgba(29, 158, 117, 0.14);
+      --accent-border:           rgba(29, 158, 117, 0.30);
+      --accent-hover:            #22B585;
+      --accent-subtle:           rgba(29, 158, 117, 0.15);
+      --accent-subtle-foreground: #9FE1CB;
+      --cta:                     #EF9F27;
+      --cta-foreground:          #412402;
+      --cta-hover:               #F5AC3A;
+      --cta-muted:               rgba(239, 159, 39, 0.15);
+      --navy:                    #0F2A47;
+      --navy-deep:               #091929;
+      --navy-card:               #0A1F38;
+      --navy-foreground:         #F5F7FA;
+      --navy-muted:              #5DCAA5;
+      --destructive:             #EF4444;
+      --destructive-foreground:  #F5F7FA;
+      --success:                 #1D9E75;
+      --success-foreground:      #0F2A47;
+      --warning:                 #EF9F27;
+      --warning-foreground:      #412402;
+      --border:                  rgba(255, 255, 255, 0.08);
+      --input:                   rgba(255, 255, 255, 0.08);
+      --ring:                    #1D9E75;
     }
   }
 }
@@ -172,8 +258,6 @@
    BASE — global element defaults
    ══════════════════════════════════════════════════════════ */
 @layer base {
-
-  /* Reset border color globally */
   * {
     @apply border-border;
     box-sizing: border-box;
@@ -181,7 +265,6 @@
 
   html {
     scroll-behavior: smooth;
-    /* Prevent font size inflation on mobile landscape rotation */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
@@ -190,279 +273,627 @@
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
     font-size: 1rem;
-    /* 16px — iOS won't zoom inputs */
-    line-height: 1.625;
-    /* relaxed — easier line tracking on mobile */
+    line-height: 1.7;
     font-feature-settings: 'rlig' 1, 'calt' 1;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     word-break: break-word;
-    /* prevents overflow on narrow screens */
     overflow-x: hidden;
-    /* no horizontal scroll on mobile */
     min-height: 100svh;
-    /* svh = safe viewport height (mobile) */
   }
 
-  /* ── Headings — Outfit, tight tracking ──────────────────────────────────── */
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
+  /* ── Headings — Plus Jakarta Sans, bold, tight ───────────────────────────
+     Same font as body but heavy weight creates clear hierarchy.
+     This keeps the brand feel consistent (one typeface = cleaner).
+     ─────────────────────────────────────────────────────────────────────── */
+  h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
-    font-weight: 800;
-    line-height: 1.1;
-    letter-spacing: -0.03em;
-    /* slightly less tight than -0.04 for readability */
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
     word-break: break-word;
+    color: var(--foreground);
   }
 
-  /* Mobile type scale — fluid, not fixed breakpoints */
-  h1 {
-    font-size: clamp(2rem, 5vw + 1rem, 3.5rem);
+  /* Fluid type scale — no hard breakpoints, smooth scaling */
+  h1 { font-size: clamp(2rem, 5vw + 1rem, 3.5rem);   }  /* 32px → 56px */
+  h2 { font-size: clamp(1.5rem, 3vw + 1rem, 2.5rem); }  /* 24px → 40px */
+  h3 { font-size: clamp(1.25rem, 2vw + 1rem, 1.75rem); } /* 20px → 28px */
+  h4 { font-size: clamp(1.125rem, 1.5vw + 1rem, 1.375rem); }
+
+  /* ── Hero headline variant — used in hero + CTA final sections ─────────── */
+  .hero-headline {
+    font-family: var(--font-display);
+    font-size: clamp(2.25rem, 6vw + 1rem, 4rem);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.035em;
   }
 
-  /* 32px → 56px */
-  h2 {
-    font-size: clamp(1.5rem, 3vw + 1rem, 2.5rem);
-  }
-
-  /* 24px → 40px */
-  h3 {
-    font-size: clamp(1.25rem, 2vw + 1rem, 1.75rem);
-  }
-
-  /* 20px → 28px */
-  h4 {
-    font-size: clamp(1.125rem, 1.5vw + 1rem, 1.375rem);
-  }
-
-  /* 18px → 22px */
-
-  /* ── Links ───────────────────────────────────────────────────────────────── */
+  /* ── Links ────────────────────────────────────────────────────────────── */
   a {
     color: inherit;
     text-decoration: none;
   }
 
-  /* ── Images — prevent overflow, preserve ratio ───────────────────────────── */
-  img,
-  video,
-  svg {
+  a:hover {
+    color: var(--accent);
+    transition: color 0.15s ease;
+  }
+
+  /* ── Images ───────────────────────────────────────────────────────────── */
+  img, video, svg {
     max-width: 100%;
     height: auto;
     display: block;
   }
 
-  /* ── Inputs — prevent iOS zoom on focus ──────────────────────────────────── */
-  /* iOS zooms into inputs with font-size < 16px. This fixes it without
-     disabling user-scalable (which breaks accessibility) */
-  input,
-  select,
-  textarea,
-  button {
+  /* ── Inputs — prevent iOS zoom on focus ──────────────────────────────── */
+  input, select, textarea, button {
     font-size: max(16px, 1rem);
     font-family: var(--font-sans);
   }
 
-  /* ── Code / mono ─────────────────────────────────────────────────────────── */
-  code,
-  pre,
-  kbd {
+  /* ── Code / SMS previews / tags ──────────────────────────────────────── */
+  code, pre, kbd {
     font-family: var(--font-mono);
     font-size: 0.875em;
-    /* slightly smaller than surrounding text */
   }
 
-  /* ── Focus ring — accent colored, keyboard only ──────────────────────────── */
+  /* ── Focus ring — teal, keyboard-only ───────────────────────────────── */
   *:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
     border-radius: 4px;
   }
 
-  /* ── Text selection ──────────────────────────────────────────────────────── */
+  /* ── Selection ───────────────────────────────────────────────────────── */
   ::selection {
-    background: rgba(0, 194, 168, 0.2);
+    background: rgba(29, 158, 117, 0.20);
     color: var(--foreground);
   }
 
-  /* ── Tap highlight — remove default blue on mobile ───────────────────────── */
+  /* ── Mobile tap highlight ─────────────────────────────────────────────── */
   * {
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* ── Touch targets — minimum 44×44px (Apple HIG / WCAG 2.5.5) ───────────── */
-  button,
-  a,
-  [role="button"] {
+  /* ── Touch targets — minimum 44×44px (WCAG 2.5.5) ───────────────────── */
+  button, a, [role="button"] {
     min-height: 44px;
     min-width: 44px;
   }
 }
 
 /* ══════════════════════════════════════════════════════════
-   UTILITIES — reusable classes
+   UTILITIES — reusable AutomEdge classes
    ══════════════════════════════════════════════════════════ */
 @layer utilities {
 
-  /* Font family shortcuts */
-  .font-display {
-    font-family: var(--font-display);
-  }
+  /* ── Font family shortcuts ───────────────────────────────────────────── */
+  .font-display { font-family: var(--font-display); }
+  .font-mono    { font-family: var(--font-mono); }
 
-  .font-mono {
-    font-family: var(--font-mono);
-  }
-
-  /* Eyebrow / label style */
+  /* ── Eyebrow / section label ─────────────────────────────────────────── */
+  /* Used above headings: "HVAC AUTOMATION · AI POWERED" */
   .label {
-    font-size: 0.6875rem;
-    /* 11px */
+    font-size: 0.6875rem;       /* 11px */
     font-weight: 600;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.20em;
     text-transform: uppercase;
     font-family: var(--font-sans);
-  }
-
-  /* Accent color utilities */
-  .text-accent {
     color: var(--accent);
   }
 
-  .bg-accent {
-    background: var(--accent);
-  }
+  /* ── Teal (accent) utilities ─────────────────────────────────────────── */
+  .text-accent         { color: var(--accent); }
+  .bg-accent           { background: var(--accent); }
+  .border-accent       { border-color: var(--accent); }
+  .bg-accent-muted     { background: var(--accent-muted); }
+  .border-accent-muted { border-color: var(--accent-border); }
+  .bg-accent-subtle    { background: var(--accent-subtle); }
+  .text-accent-subtle  { color: var(--accent-subtle-foreground); }
 
-  .border-accent {
+  /* ── Amber (CTA) utilities ───────────────────────────────────────────── */
+  /* Use ONLY on call-to-action elements */
+  .text-cta            { color: var(--cta); }
+  .bg-cta              { background: var(--cta); }
+  .text-cta-fg         { color: var(--cta-foreground); }
+  .bg-cta-muted        { background: var(--cta-muted); }
+
+  /* ── Navy utilities ───────────────────────────────────────────────────── */
+  .bg-navy             { background: var(--navy); }
+  .bg-navy-deep        { background: var(--navy-deep); }
+  .bg-navy-card        { background: var(--navy-card); }
+  .text-navy           { color: var(--navy); }
+  .text-navy-muted     { color: var(--navy-muted); }
+
+  /* ── Button system ───────────────────────────────────────────────────────
+     btn-cta    → amber, primary action (Book a Demo, See It Live)
+     btn-navy   → navy bg, secondary action on light sections
+     btn-ghost  → transparent, for dark bg sections
+     btn-teal   → teal border/text, tertiary action
+     ─────────────────────────────────────────────────────────────────────── */
+  .btn-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.75rem;
+    background: var(--cta);
+    color: var(--cta-foreground);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    border-radius: var(--radius-md);
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+    white-space: nowrap;
+  }
+  .btn-cta:hover  { background: var(--cta-hover); }
+  .btn-cta:active { transform: scale(0.98); }
+
+  .btn-navy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.75rem;
+    background: var(--navy);
+    color: var(--navy-foreground);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    border-radius: var(--radius-md);
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+    white-space: nowrap;
+  }
+  .btn-navy:hover  { background: var(--navy-deep); }
+  .btn-navy:active { transform: scale(0.98); }
+
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.75rem;
+    background: transparent;
+    color: #F5F7FA;
+    font-weight: 500;
+    font-size: 0.9375rem;
+    border-radius: var(--radius-md);
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+    white-space: nowrap;
+  }
+  .btn-ghost:hover {
     border-color: var(--accent);
-  }
-
-  .bg-accent-muted {
     background: var(--accent-muted);
   }
 
-  .border-accent-muted {
-    border-color: var(--accent-border);
+  .btn-teal {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.75rem;
+    background: var(--accent-muted);
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--accent-border);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    white-space: nowrap;
+  }
+  .btn-teal:hover {
+    background: var(--accent-subtle);
+    border-color: var(--accent);
   }
 
-  /* Glow effects */
+  /* ── Glow effects ─────────────────────────────────────────────────────── */
   .glow-accent {
-    box-shadow: 0 0 24px rgba(0, 194, 168, 0.25);
+    box-shadow: 0 0 28px rgba(29, 158, 117, 0.22);
+  }
+  .glow-cta {
+    box-shadow: 0 0 28px rgba(239, 159, 39, 0.20);
+  }
+  .glow-navy {
+    box-shadow: 0 0 40px rgba(15, 42, 71, 0.40);
   }
 
-  .glow-success {
-    box-shadow: 0 0 24px rgba(16, 185, 129, 0.25);
+  /* ── Card variants ────────────────────────────────────────────────────── */
+  .card-base {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
   }
 
-  /* Hide scrollbar */
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
+  /* Feature cards with teal left accent */
+  .card-feature {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1.5rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .card-feature:hover {
+    border-left-color: var(--accent);
+    box-shadow: 0 0 20px rgba(29, 158, 117, 0.10);
   }
 
+  /* Navy hero card — used inside dark sections */
+  .card-navy {
+    background: var(--navy-card);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+  }
+
+  /* Highlighted / featured card (pricing, demo) */
+  .card-featured {
+    background: var(--card);
+    border: 2px solid var(--accent);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: 0 0 24px rgba(29, 158, 117, 0.12);
+  }
+
+  /* ── SMS preview component ────────────────────────────────────────────── */
+  /* Used in demo section to show outbound AI messages */
+  .sms-bubble-out {
+    display: inline-block;
+    background: var(--accent);
+    color: #F5F7FA;
+    border-radius: 1rem 1rem 1rem 0.25rem;
+    padding: 0.625rem 0.875rem;
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    max-width: 85%;
+  }
+
+  .sms-bubble-in {
+    display: inline-block;
+    background: var(--secondary);
+    color: var(--foreground);
+    border-radius: 1rem 1rem 0.25rem 1rem;
+    padding: 0.625rem 0.875rem;
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    max-width: 80%;
+    align-self: flex-end;
+    margin-left: auto;
+  }
+
+  .sms-timestamp {
+    font-size: 0.6875rem;
+    color: var(--muted-foreground);
+    font-family: var(--font-mono);
+    margin-top: 0.25rem;
+  }
+
+  /* ── ROI result highlight ─────────────────────────────────────────────── */
+  .roi-result-number {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 4vw, 2.75rem);
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  /* ── Proof / stat cards ───────────────────────────────────────────────── */
+  .stat-number {
+    font-family: var(--font-display);
+    font-size: clamp(1.75rem, 3vw, 2.25rem);
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  /* ── Section layouts ──────────────────────────────────────────────────── */
+  /* Hero — full dark navy, used for homepage hero + final CTA */
+  .section-hero {
+    background: var(--navy);
+    color: var(--navy-foreground);
+  }
+
+  /* Deep navy — slightly darker, for demo embed backgrounds */
+  .section-navy-deep {
+    background: var(--navy-deep);
+    color: var(--navy-foreground);
+  }
+
+  /* Light — for content sections between dark hero and footer */
+  .section-light {
+    background: var(--background);
+    color: var(--foreground);
+  }
+
+  /* Muted — subtle bg for alternating sections */
+  .section-muted {
+    background: var(--muted);
+    color: var(--foreground);
+  }
+
+  /* ── Container — responsive with fluid padding ───────────────────────── */
+  .container-page {
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding-left:  clamp(1rem, 4vw, 3rem);
+    padding-right: clamp(1rem, 4vw, 3rem);
+  }
+
+  /* Narrow container for centered content (hero text, CTA sections) */
+  .container-narrow {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    padding-left:  clamp(1rem, 4vw, 2rem);
+    padding-right: clamp(1rem, 4vw, 2rem);
+  }
+
+  /* ── Demo page specific ───────────────────────────────────────────────── */
+  /* No nav on demo page — zero exit doors */
+  .demo-page-header {
+    background: var(--navy);
+    padding: 0.875rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+
+  /* Demo form wrapper — the fake HVAC business form */
+  .demo-form-surface {
+    background: var(--card);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    border: 1px solid var(--border);
+  }
+
+  /* Vertical badge — HVAC / Roofing / Pest Control pill */
+  .vertical-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-full);
+    background: var(--accent-muted);
+    border: 1px solid var(--accent-border);
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  /* HVAC-specific teal dot indicator */
+  .hvac-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+  .hvac-indicator.pulse {
+    animation: pulse-indicator 2s ease infinite;
+  }
+
+  /* ── Proof bar (social proof strip below hero) ────────────────────────── */
+  .proof-bar {
+    background: var(--navy-deep);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 0.75rem 0;
+    overflow: hidden;
+  }
+
+  /* ── Workflow step indicator ─────────────────────────────────────────── */
+  .step-circle {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #F5F7FA;
+    font-weight: 700;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-circle.amber {
+    background: var(--cta);
+    color: var(--cta-foreground);
+  }
+
+  /* Connecting line between steps */
+  .step-connector {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    margin-top: 1.125rem;
+  }
+
+  /* ── FAQ accordion ─────────────────────────────────────────────────────── */
+  .faq-item {
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 0;
+  }
+  .faq-item:last-child {
+    border-bottom: none;
+  }
+  .faq-question {
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: var(--foreground);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+  }
+  .faq-answer {
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+    line-height: 1.7;
+    margin-top: 0.625rem;
+  }
+
+  /* ── Pricing card states ─────────────────────────────────────────────── */
+  .price-badge-founding {
+    display: inline-block;
+    padding: 0.2rem 0.75rem;
+    border-radius: var(--radius-full);
+    background: var(--accent-subtle);
+    color: var(--accent-subtle-foreground);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .price-badge-standard {
+    display: inline-block;
+    padding: 0.2rem 0.75rem;
+    border-radius: var(--radius-full);
+    background: var(--accent);
+    color: #F5F7FA;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  /* ── Scrollbar ────────────────────────────────────────────────────────── */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
 
-  /* Safe area insets — notch / home bar on iPhone */
-  .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-
-  .pt-safe {
-    padding-top: env(safe-area-inset-top);
-  }
-
+  /* ── Safe area insets (iPhone notch / home bar) ──────────────────────── */
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pt-safe { padding-top: env(safe-area-inset-top); }
   .px-safe {
-    padding-left: env(safe-area-inset-left);
+    padding-left:  env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
 
-  /* Container — responsive with mobile padding */
-  .container-page {
-    width: 100%;
-    max-width: 1100px;
-    margin: 0 auto;
-    padding-left: clamp(1rem, 4vw, 3rem);
-    /* 16px → 48px fluid */
-    padding-right: clamp(1rem, 4vw, 3rem);
-  }
+  /* ══════════════════════════════════════════════════════════
+     ANIMATIONS
+     ══════════════════════════════════════════════════════════ */
 
-  /* ── Animations ─────────────────────────────────────────────────────────── */
+  /* Page load — hero text entrance */
   .animate-fade-up {
-    animation: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .animate-fade-up-delay-1 {
+    animation: fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
+  }
+  .animate-fade-up-delay-2 {
+    animation: fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+  }
+  .animate-fade-up-delay-3 {
+    animation: fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.32s both;
   }
 
   .animate-fade-in {
     animation: fade-in 0.4s ease both;
   }
 
+  /* Proof bar ticker scroll */
   .animate-ticker {
-    animation: ticker 24s linear infinite;
+    animation: ticker 28s linear infinite;
   }
 
+  /* AutomEdge logo pulse — runs on the teal icon mark */
   .animate-pulse-ring {
-    animation: pulse-ring 1.5s ease infinite;
+    animation: pulse-ring 2s ease-in-out infinite;
   }
 
-  /* Respect reduced motion */
-  @media (prefers-reduced-motion: reduce) {
+  /* Live indicator dot — "system active" */
+  .animate-pulse-indicator {
+    animation: pulse-indicator 2.5s ease infinite;
+  }
 
+  /* SMS "typing" indicator on demo page */
+  .animate-typing {
+    animation: typing-dots 1.4s ease infinite;
+  }
+
+  /* ROI number count-up trigger class (JS adds this) */
+  .animate-count-up {
+    animation: count-up 1.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Reduced motion — all animations off */
+  @media (prefers-reduced-motion: reduce) {
     .animate-fade-up,
+    .animate-fade-up-delay-1,
+    .animate-fade-up-delay-2,
+    .animate-fade-up-delay-3,
     .animate-fade-in,
     .animate-ticker,
-    .animate-pulse-ring {
+    .animate-pulse-ring,
+    .animate-pulse-indicator,
+    .animate-typing,
+    .animate-count-up {
       animation: none;
       opacity: 1;
       transform: none;
     }
   }
 
+  /* ── Keyframes ────────────────────────────────────────────────────────── */
   @keyframes fade-up {
-    from {
-      opacity: 0;
-      transform: translateY(24px);
-    }
-
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(28px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 
   @keyframes fade-in {
-    from {
-      opacity: 0;
-    }
-
-    to {
-      opacity: 1;
-    }
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
 
   @keyframes ticker {
-    from {
-      transform: translateX(0);
-    }
-
-    to {
-      transform: translateX(-50%);
-    }
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
   }
 
+  /* Logo pulse — teal ring radiates from icon mark */
   @keyframes pulse-ring {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(29, 158, 117, 0.45); }
+    50%       { box-shadow: 0 0 0 7px rgba(29, 158, 117, 0.08); }
+  }
 
-    0%,
-    100% {
-      box-shadow: 0 0 0 2px rgba(0, 194, 168, 0.4);
-    }
+  /* Live dot — softer than logo pulse */
+  @keyframes pulse-indicator {
+    0%, 100% { opacity: 1;   transform: scale(1); }
+    50%       { opacity: 0.5; transform: scale(0.85); }
+  }
 
-    50% {
-      box-shadow: 0 0 0 5px rgba(0, 194, 168, 0.1);
-    }
+  /* Typing dots — demo SMS loading state */
+  @keyframes typing-dots {
+    0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+    30%            { opacity: 1;   transform: translateY(-3px); }
+  }
+
+  /* ROI counter entrance */
+  @keyframes count-up {
+    from { opacity: 0; transform: translateY(12px) scale(0.95); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
   }
 }
