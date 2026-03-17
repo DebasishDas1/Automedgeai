@@ -1,22 +1,31 @@
 asyncpg>=0.31.0
+orjson>=3.10.0
 fastapi>=0.115.0
-firebase-admin>=7.2.0
-gspread>=6.2.1
 httpx>=0.28.1
 
+# LLM stack (dual mode: prod + local)
 langchain-groq>=1.1.2
 langchain-ollama>=1.0.1
-langchain-openai>=1.1.10
 langgraph>=1.0.10
 groq>=0.9.0
 
+# Core config & validation
 pydantic>=2.12.5
 pydantic-settings>=2.13.1
 python-dotenv>=1.2.2
 
-resend>=2.23.0
+# Logging & resilience
+structlog>=24.4.0
+tenacity>=9.0.0
+
+# Database
 sqlalchemy[asyncio]>=2.0.48
 
+# Optional integrations (keep only if used)
+firebase-admin>=7.2.0
+gspread>=6.2.1
+resend>=2.23.0
 twilio>=9.10.2
 
+# Server
 uvicorn[standard]>=0.30.0

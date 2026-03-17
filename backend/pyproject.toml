@@ -4,21 +4,37 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
+
 dependencies = [
     "asyncpg>=0.31.0",
-    "fastapi>=0.135.1",
-    "firebase-admin>=7.2.0",
-    "gspread>=6.2.1",
+    "orjson>=3.10.0",
+    "fastapi>=0.115.0",
     "httpx>=0.28.1",
+
+    # LLM stack (dual mode)
     "langchain-groq>=1.1.2",
     "langchain-ollama>=1.0.1",
-    "langchain-openai>=1.1.10",
     "langgraph>=1.0.10",
+    "groq>=0.9.0",
+
+    # Core config
+    "pydantic>=2.12.5",
     "pydantic-settings>=2.13.1",
-    "pydantic[email]>=2.12.5",
     "python-dotenv>=1.2.2",
-    "resend>=2.23.0",
+
+    # Logging & retries
+    "structlog>=24.4.0",
+    "tenacity>=9.0.0",
+
+    # Database
     "sqlalchemy[asyncio]>=2.0.48",
+
+    # Optional integrations (remove if unused)
+    "firebase-admin>=7.2.0",
+    "gspread>=6.2.1",
+    "resend>=2.23.0",
     "twilio>=9.10.2",
-    "uvicorn[standard]>=0.41.0",
+
+    # Server
+    "uvicorn[standard]>=0.30.0",
 ]

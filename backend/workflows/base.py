@@ -20,7 +20,6 @@ def field_missing(state: dict, key: str) -> bool:
 
 
 def merge_extracted(state: dict, extracted: dict) -> dict:
-    """Merge LLM-extracted fields into state. First-capture wins."""
     for k, v in extracted.items():
         if v is None:
             continue
@@ -78,7 +77,6 @@ def full_transcript(state: dict) -> str:
 # ── Appointment slots ─────────────────────────────────────────────────────────
 
 def get_appt_slots() -> list[str]:
-    """Three concrete appointment slot strings, starting tomorrow."""
     today = datetime.now()
     return [
         (today + timedelta(days=1)).strftime("%A, %b %d at 10:00 AM"),

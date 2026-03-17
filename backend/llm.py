@@ -1,151 +1,56 @@
-import logging
-from dataclasses import dataclass
-from typing import List
-
-from groq import Groq
+import asyncio
+import structlog
+from typing import List, Any
+from tenacity import retry, stop_after_attempt, wait_exponential
+from langchain_groq import ChatGroq
 from langchain_ollama import ChatOllama
 from langchain_core.messages import BaseMessage
-
 from core.config import settings
+from core.cache import cache
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
+# Global concurrency guard for LLM calls (prevents event loop saturation)
+_llm_semaphore = asyncio.Semaphore(20)
 
-# ─────────────────────────────────────────────────────────────
-# Response wrapper
-# ─────────────────────────────────────────────────────────────
-
-@dataclass
-class LLMResponse:
-    content: str
-
-
-# ─────────────────────────────────────────────────────────────
-# Convert LangChain → OpenAI format
-# ─────────────────────────────────────────────────────────────
-
-def _to_openai_messages(messages: List[BaseMessage]) -> List[dict]:
-    role_map = {
-        "system": "system",
-        "human": "user",
-        "ai": "assistant",
-        "assistant": "assistant",
-    }
-
-    formatted = []
-
-    for m in messages:
-        msg_type = m.__class__.__name__.lower().replace("message", "")
-        role = role_map.get(msg_type, "user")
-
-        formatted.append({
-            "role": role,
-            "content": m.content
-        })
-
-    return formatted
-
-
-# ─────────────────────────────────────────────────────────────
-# LLM Router
-# ─────────────────────────────────────────────────────────────
-
-class LLM:
-
+class LLMManager:
     def __init__(self):
+        self._primary = ChatGroq(
+            api_key=settings.GROQ_API_KEY,
+            model="llama-3.3-70b-versatile",
+            temperature=0.7,
+            timeout=10.0
+        ) if settings.GROQ_API_KEY else None
 
-        self.use_groq = bool(settings.GROQ_API_KEY)
-        self.env = settings.ENVIRONMENT.lower()
-
-        # create clients ONCE (important optimization)
-        if self.use_groq:
-            self.groq = Groq(api_key=settings.GROQ_API_KEY)
-            logger.info("LLM provider: Groq")
-        else:
-            self.groq = None
-
-        self.ollama = ChatOllama(
+        self._fallback = ChatOllama(
             model="qwen3:1.7b",
             temperature=0.7,
         )
 
-        if not self.use_groq:
-            logger.info("LLM provider: Ollama")
+    async def ainvoke(self, messages: List[BaseMessage], **kwargs) -> Any:
+        # Context window management
+        trimmed = messages[-8:]
+        
+        # Cache check
+        key = str([m.content for m in trimmed])
+        cached = cache.get("llm", key)
+        if cached: return cached
 
-    # ─────────────────────────────────────────
+        async with _llm_semaphore:
+            try:
+                use_groq = settings.ENVIRONMENT == "prod" and self._primary
+                target = self._primary if use_groq else self._fallback
+                resp = await self._call(target, trimmed, **kwargs)
+                cache.set("llm", key, resp, ttl=1800)
+                return resp
+            except Exception as e:
+                logger.error("llm_error", error=str(e))
+                if target != self._fallback:
+                    return await self._call(self._fallback, trimmed, **kwargs)
+                raise
 
-    def _call_groq(
-        self,
-        messages,
-        max_tokens,
-        temperature
-    ) -> LLMResponse:
+    @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=1, min=1, max=4))
+    async def _call(self, llm, msgs, **kwargs):
+        return await asyncio.wait_for(llm.ainvoke(msgs, **kwargs), timeout=12.0)
 
-        response = self.groq.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
-
-        content = response.choices[0].message.content or ""
-
-        return LLMResponse(content=content)
-
-    # ─────────────────────────────────────────
-
-    def _call_ollama(
-        self,
-        messages: List[BaseMessage]
-    ) -> LLMResponse:
-
-        response = self.ollama.invoke(messages)
-
-        content = response.content if response else ""
-
-        logger.debug(f"Ollama response → {len(content)} chars")
-
-        return LLMResponse(content=content)
-
-    # ─────────────────────────────────────────
-    # Main invoke
-    # ─────────────────────────────────────────
-
-    def invoke(
-        self,
-        messages: List[BaseMessage],
-        max_tokens: int = 500,
-        temperature: float = 0.7,
-    ) -> LLMResponse:
-
-        try:
-
-            # Dev mode → always local model
-            if self.env == "dev":
-                return self._call_ollama(messages)
-
-            # Production → Groq if configured
-            if self.use_groq:
-                openai_messages = _to_openai_messages(messages)
-
-                return self._call_groq(
-                    openai_messages,
-                    max_tokens,
-                    temperature,
-                )
-
-            # fallback if Groq key missing
-            return self._call_ollama(messages)
-
-        except Exception as e:
-
-            logger.error(f"LLM error → fallback to Ollama: {e}")
-
-            return self._call_ollama(messages)
-
-
-# ─────────────────────────────────────────────────────────────
-# Global instance
-# ─────────────────────────────────────────────────────────────
-
-llm = LLM()
+llm = LLMManager()

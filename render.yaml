@@ -87,4 +87,4 @@ services:
 
       # CORS
       - key: ALLOWED_ORIGINS
-        value: "https://automedge.vercel.app,http://localhost:3000"
+        value: '["https://automedge.vercel.app","http://localhost:3000"]'
