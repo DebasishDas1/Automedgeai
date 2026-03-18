@@ -1,14 +1,20 @@
-import Link from "next/link";
+"use client";
+
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { useDomainNavigation } from "@/hook/useDomainNavigation";
+import Link from "next/link";
+
+const MAIN_DOMAIN = process.env.NEXT_PUBLIC_MAIN_DOMAIN || "/";
 
 export const DemoPageNavbar = () => {
+  const { goHome } = useDomainNavigation();
   return (
     <nav className="fixed top-0 z-50 w-full bg-background/70 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
         {/* Logo */}
-        <Link
-          href="/"
+        <a
+          onClick={() => goHome()}
           className="relative flex items-center w-[140px] h-[40px]"
         >
           {/* Light Mode Logo */}
@@ -30,10 +36,10 @@ export const DemoPageNavbar = () => {
             priority
             className="object-contain hidden dark:block select-none pointer-events-none"
           />
-        </Link>
+        </a>
 
         {/* CTA */}
-        <Link href="#demo">
+        <Link href="#calendar">
           <Button className="bg-cta px-4 py-2 rounded-full font-semibold">
             Get a Free Demo
           </Button>

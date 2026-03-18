@@ -33,7 +33,7 @@ function HandWrittenTitle({
           animate="visible"
           className="w-full h-full"
         >
-          <title>KokonutUI</title>
+          {/* <title>KokonutUI</title> */}
           <motion.path
             d="M 950 90 
                            C 1250 300, 1050 480, 600 520
@@ -46,7 +46,7 @@ function HandWrittenTitle({
             strokeLinecap="round"
             strokeLinejoin="round"
             variants={draw}
-            className="text-black dark:text-white opacity-90"
+            className="text-cta"
           />
         </motion.svg>
       </div>

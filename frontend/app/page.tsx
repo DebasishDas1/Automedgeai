@@ -7,6 +7,7 @@ import { LogoCloud } from "@/components/LogoCloud";
 import { FAQSection } from "@/components/FAQSection";
 import { ContactSection } from "@/components/ContactSection";
 import { HowItWorks } from "@/components/HowItWorks";
+import { DemoWorkflowSection } from "@/components/DemoWorkflowSection";
 import { Footer } from "@/components/ui/large-name-footer";
 
 const FAQS = [
@@ -47,6 +48,7 @@ export default function Homepage() {
         <ProblemSection />
         <HowItWorks />
         <SolutionSection />
+        <DemoWorkflowSection />
         <ImpactSection />
         <LogoCloud />
         <FAQSection faqs={FAQS} />

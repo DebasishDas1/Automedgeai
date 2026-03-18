@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { useDomainNavigation } from "@/hook/useDomainNavigation";
 
 const navItems = [
   { title: "The Problem", href: "#problem" },
@@ -10,11 +13,14 @@ const navItems = [
 ];
 
 export function Navbar() {
+  const { goHome } = useDomainNavigation();
+
   return (
     <nav className="fixed top-0 z-50 w-full bg-background/70 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
         {/* Logo */}
-        <Link
+        <a
+          onClick={() => goHome()}
           href="/"
           className="relative flex items-center w-[140px] h-[40px]"
         >
@@ -37,7 +43,7 @@ export function Navbar() {
             priority
             className="object-contain hidden dark:block select-none pointer-events-none"
           />
-        </Link>
+        </a>
 
         {/* Desktop Navigation */}
         <div className="hidden lg:flex items-center gap-8 font-black">

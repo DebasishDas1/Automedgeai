@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import Chatbot from "@/components/shared/ChatbotClient";
+import Chatbot from "@/components/shared/Chatbot";
 import { DemoPageNavbar } from "@/components/shared/DemoPageNavbar";
 import { DemoPageHero } from "@/components/shared/DemoPageHero";
 import { DemoPageFooter } from "@/components/shared/DemoPageFooter";
@@ -160,7 +160,7 @@ and books the treatment. See it live below."
 
       <DemoPageFooter />
 
-      <Chatbot vertical="pest_control" accentColor="#00C2A8" />
+      <Chatbot vertical="pest_control" />
     </main>
   );
 }

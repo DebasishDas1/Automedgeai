@@ -86,7 +86,7 @@ export const DemoPageCalendar = ({
 
   return (
     <section
-      id="demo"
+      id="calendar"
       className="relative py-24 px-6 max-w-5xl mx-auto scroll-mt-24"
     >
       {/* Background Blobs */}

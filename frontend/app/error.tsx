@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, RefreshCcw, Home } from "lucide-react";
-import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
+import { useDomainNavigation } from "@/hook/useDomainNavigation";
 
 export default function Error({
   error,
@@ -14,6 +14,7 @@ export default function Error({
   reset: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
+  const { goHome } = useDomainNavigation();
 
   useEffect(() => {
     // Log the error to an error reporting service
@@ -37,25 +38,29 @@ export default function Error({
         <h1 className="text-4xl md:text-5xl font-outfit font-black tracking-tight mb-4">
           Something went wrong
         </h1>
-        
+
         <p className="text-lg text-muted-foreground max-w-md mx-auto mb-10">
-          An unexpected error occurred while processing your request. Our team has been notified.
+          An unexpected error occurred while processing your request. Our team
+          has been notified.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 items-center">
-          <Button 
-            onClick={() => reset()} 
+          <Button
+            onClick={() => reset()}
             className="px-8 py-6 text-base bg-foreground text-background hover:bg-foreground/90 group"
           >
             <RefreshCcw className="w-5 h-5 mr-2 transition-transform group-hover:rotate-180 duration-500" />
             Try again
           </Button>
-          <Link href="/">
-            <Button variant="outline" className="px-8 py-6 text-base text-muted-foreground border-border hover:bg-accent/5">
+          <a onClick={goHome}>
+            <Button
+              variant="outline"
+              className="px-8 py-6 text-base text-muted-foreground border-border hover:bg-accent/5"
+            >
               <Home className="w-5 h-5 mr-2" />
               Go home
             </Button>
-          </Link>
+          </a>
         </div>
       </div>
     </main>

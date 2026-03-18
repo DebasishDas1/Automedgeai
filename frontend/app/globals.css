@@ -857,6 +857,34 @@
     }
   }
 
+  /* ── Premium Scrollbar ───────────────────────────────────────────────────── */
+  .chat-scrollbar::-webkit-scrollbar {
+    width: 5px;
+  }
+  .chat-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .chat-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(29, 158, 117, 0.15);
+    border-radius: 10px;
+  }
+  .chat-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(29, 158, 117, 0.3);
+  }
+
+  /* ── Chat Utilities ──────────────────────────────────────────────────────── */
+  .glass-premium {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .dark .glass-premium {
+    background: rgba(15, 42, 71, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
   /* ── Keyframes ────────────────────────────────────────────────────────── */
   @keyframes fade-up {
     from { opacity: 0; transform: translateY(28px); }
@@ -873,25 +901,21 @@
     to   { transform: translateX(-50%); }
   }
 
-  /* Logo pulse — teal ring radiates from icon mark */
   @keyframes pulse-ring {
     0%, 100% { box-shadow: 0 0 0 2px rgba(29, 158, 117, 0.45); }
     50%       { box-shadow: 0 0 0 7px rgba(29, 158, 117, 0.08); }
   }
 
-  /* Live dot — softer than logo pulse */
   @keyframes pulse-indicator {
     0%, 100% { opacity: 1;   transform: scale(1); }
     50%       { opacity: 0.5; transform: scale(0.85); }
   }
 
-  /* Typing dots — demo SMS loading state */
   @keyframes typing-dots {
     0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
     30%            { opacity: 1;   transform: translateY(-3px); }
   }
 
-  /* ROI counter entrance */
   @keyframes count-up {
     from { opacity: 0; transform: translateY(12px) scale(0.95); }
     to   { opacity: 1; transform: translateY(0) scale(1); }

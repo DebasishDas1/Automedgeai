@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import Chatbot from "@/components/shared/ChatbotClient";
+import Chatbot from "@/components/shared/Chatbot";
 import { DemoPageNavbar } from "@/components/shared/DemoPageNavbar";
 import { DemoPageHero } from "@/components/shared/DemoPageHero";
 import { DemoPageFooter } from "@/components/shared/DemoPageFooter";
@@ -165,7 +165,7 @@ export default function PlumbingPage() {
 
       <DemoPageFooter />
 
-      <Chatbot vertical="plumbing" accentColor="#00C2A8" />
+      <Chatbot vertical="plumbing" />
     </main>
   );
 }

@@ -1,11 +1,14 @@
+"use client";
+
 import { GLSLHills } from "@/components/ui/glsl-hills";
-import Link from "next/link";
 import { Zap, Check, Video } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useDomainNavigation } from "@/hook/useDomainNavigation";
 
 const badges = ["14 day setup", "No long contracts", "Works with your CRM"];
 
 export const ModernHero = () => {
+  const { goTo } = useDomainNavigation();
   return (
     <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden ">
       <GLSLHills />
@@ -22,19 +25,19 @@ export const ModernHero = () => {
           books, and follows up automatically. No extra staff.
         </p>
         <div className="flex gap-4 flex-wrap items-center justify-center">
-          <Link href="/hvac">
-            <button className="flex items-center gap-2 bg-[#00C2A8] text-[#0D1B2A] px-7 py-4 rounded-xl font-bold hover:scale-[1.03] transition">
+          <a onClick={() => goTo("demo-hvac")} href="/hvac">
+            <button className="flex items-center gap-2 bg-accent text-primary px-7 py-4 rounded-xl font-bold hover:scale-[1.03] transition">
               <Zap className="w-4 h-4" />
               See it Live - Free Demo
             </button>
-          </Link>
+          </a>
 
-          <Link href="#contact">
-            <button className="flex items-center gap-2 px-7 py-4 rounded-xl border border-[#00C2A8]">
-              <Video className="w-4 h-4 text-[#00C2A8]" />
+          <a onClick={() => goTo("contact")}>
+            <button className="flex items-center gap-2 px-7 py-4 rounded-xl border border-accent">
+              <Video className="w-4 h-4 text-accent" />
               Watch 3-minute Video
             </button>
-          </Link>
+          </a>
         </div>
 
         <div className="flex gap-6 flex-wrap items-center justify-center">

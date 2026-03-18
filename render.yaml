@@ -88,3 +88,7 @@ services:
       # CORS
       - key: ALLOWED_ORIGINS
         value: '["https://automedge.vercel.app", "http://localhost:3000"]'
+
+      # Frontend
+      - key: NEXT_PUBLIC_MAIN_DOMAIN
+        value: "automedge.com"
