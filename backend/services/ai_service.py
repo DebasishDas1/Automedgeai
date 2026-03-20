@@ -101,6 +101,81 @@ class AIService:
             log.error("extract_fields_failed", error=str(exc))
             return None
 
+
+    async def extract_pest_fields(self, last_user_message: str) -> dict | None:
+        """
+        Extract pest-control-specific fields from a single user message.
+        Separate from extract_fields() so pest and HVAC schemas stay independent.
+        """
+        from workflows.pest_control.prompts import PEST_EXTRACT_SYSTEM
+        log = logger.bind(service="extract_pest_fields")
+        try:
+            resp = await llm.ainvoke([
+                SystemMessage(content=PEST_EXTRACT_SYSTEM),
+                HumanMessage(content=last_user_message),
+            ])
+            data = parse_json(resp.content)
+            if data:
+                # Filter out all-null dicts to avoid noisy logging
+                non_null = {k: v for k, v in data.items() if v is not None}
+                log.debug("extract_pest_fields_ok", fields=non_null)
+                return data
+            log.warning("extract_pest_fields_empty", raw=resp.content[:120])
+            return None
+        except Exception as exc:
+            log.error("extract_pest_fields_failed", error=str(exc))
+            return None
+
+
+    async def extract_plumbing_fields(self, last_user_message: str) -> dict | None:
+        """
+        Extract plumbing-specific fields from a single user message.
+        Handles emergency vs routine detection, water damage signals,
+        and shutoff valve status.
+        """
+        from workflows.plumbing.prompts import PLUMBING_EXTRACT_SYSTEM
+        log = logger.bind(service="extract_plumbing_fields")
+        try:
+            resp = await llm.ainvoke([
+                SystemMessage(content=PLUMBING_EXTRACT_SYSTEM),
+                HumanMessage(content=last_user_message),
+            ])
+            data = parse_json(resp.content)
+            if data:
+                non_null = {k: v for k, v in data.items() if v is not None}
+                log.debug("extract_plumbing_fields_ok", fields=non_null)
+                return data
+            log.warning("extract_plumbing_fields_empty", raw=resp.content[:120])
+            return None
+        except Exception as exc:
+            log.error("extract_plumbing_fields_failed", error=str(exc))
+            return None
+
+
+    async def extract_roofing_fields(self, last_user_message: str) -> dict | None:
+        """
+        Extract roofing-specific fields from a single user message.
+        Handles storm vs wear detection, insurance status, and adjuster involvement.
+        """
+        from workflows.roofing.prompts import ROOFING_EXTRACT_SYSTEM
+        log = logger.bind(service="extract_roofing_fields")
+        try:
+            resp = await llm.ainvoke([
+                SystemMessage(content=ROOFING_EXTRACT_SYSTEM),
+                HumanMessage(content=last_user_message),
+            ])
+            data = parse_json(resp.content)
+            if data:
+                non_null = {k: v for k, v in data.items() if v is not None}
+                log.debug("extract_roofing_fields_ok", fields=non_null)
+                return data
+            log.warning("extract_roofing_fields_empty", raw=resp.content[:120])
+            return None
+        except Exception as exc:
+            log.error("extract_roofing_fields_failed", error=str(exc))
+            return None
+
+
     async def classify_conversation(self, messages: list[dict]) -> dict | None:
         log = logger.bind(service="classify_conversation")
         transcript = full_transcript({"messages": messages})
