@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { startChatSession, sendChatMessage } from "@/lib/api/chat";
+import { toast } from "sonner";
 
 import { Message, ChatbotProps, UserInfo } from "./types";
 import { CONFIGS, uid } from "./configs";
@@ -11,6 +12,7 @@ import { Header } from "./Header";
 import { LeadForm } from "./LeadForm";
 import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
+import { ShieldCheck } from "lucide-react";
 
 export function Chatbot({ vertical = "general" }: ChatbotProps) {
   const cfg = CONFIGS[vertical];
@@ -36,19 +38,6 @@ export function Chatbot({ vertical = "general" }: ChatbotProps) {
   const sessionInit = useRef(false);
 
   // ── THE CORE FIX ──────────────────────────────────────────────────────────
-  // sessionId is captured by the handleSend closure at creation time.
-  // When handleSend is created (during form step), sessionId === null.
-  // When the user sends their FIRST message, the closure still sees the null
-  // from when it was created, even though setSessionId() was called later.
-  //
-  // React state updates are async — the closure does NOT automatically see
-  // new state values. The handleSend useCallback re-creates when its deps
-  // change, but the dep array had [sessionId] which was null at mount,
-  // and the closure was being read from a stale snapshot.
-  //
-  // The reliable fix: store sessionId in a ref so it's always the live value,
-  // regardless of when the closure was created. The ref is mutable and shared —
-  // reading sessionIdRef.current always gives the current value.
   const sessionIdRef = useRef<string | null>(null);
 
   // Keep ref in sync with state (state drives UI reactivity, ref drives logic)
@@ -93,9 +82,6 @@ export function Chatbot({ vertical = "general" }: ChatbotProps) {
     setIsSubmitting(true);
     try {
       const data = await startChatSession(apiVertical, userInfo);
-      // FIX: use setSession() so both state AND ref are updated atomically.
-      // Previously only setSessionId(data.session_id) was called — the ref
-      // was never set, so handleSend always read null from sessionIdRef.
       setSession(data.session_id);
 
       setTimeout(() => {
@@ -117,10 +103,19 @@ export function Chatbot({ vertical = "general" }: ChatbotProps) {
     }
   };
 
+  // ── Reset Chat ─────────────────────────────────────────────────────────────
+  const resetChat = useCallback(() => {
+    setMessages([]);
+    setSessionId(null);
+    sessionIdRef.current = null;
+    setUserInfo({ name: "", email: "", phone: "" });
+    setStep("form");
+    setIsComplete(false);
+    isCompleteRef.current = false;
+    sessionInit.current = false;
+  }, []);
+
   // ── Send message ───────────────────────────────────────────────────────────
-  // FIX: removed sessionId from deps array — we read sessionIdRef.current
-  // instead so the closure is never stale. isTyping and isComplete are also
-  // read from refs below for the same reason (they're guards, not UI values).
   const isTypingRef = useRef(false);
   const isCompleteRef = useRef(false);
 
@@ -156,6 +151,19 @@ export function Chatbot({ vertical = "general" }: ChatbotProps) {
         if (data?.is_complete) {
           setIsComplete(true);
           isCompleteRef.current = true;
+
+          // Transition to direct alert/success state
+          setIsOpen(false);
+          
+          toast.success("Request Processed!", {
+            description: "Your inquiry has been successfully received by our team.",
+            duration: 6000,
+            icon: <ShieldCheck className="w-5 h-5 text-emerald-500" />,
+            className: "bg-white dark:bg-slate-900 border-2 border-emerald-500/20 rounded-2xl shadow-xl",
+          });
+
+          resetChat();
+          return;
         }
 
         addBotMsg(
@@ -177,7 +185,7 @@ export function Chatbot({ vertical = "general" }: ChatbotProps) {
         isTypingRef.current = false;
       }
     },
-    [input, apiVertical, addBotMsg],
+    [input, apiVertical, addBotMsg, resetChat],
   );
 
   return (

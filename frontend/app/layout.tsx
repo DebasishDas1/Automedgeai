@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Outfit, Plus_Jakarta_Sans, DM_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import { Toaster } from "@/components/ui/sonner";
 
 // Display — Outfit
 const outfit = Outfit({
@@ -112,6 +113,7 @@ export default function RootLayout({
           }}
         />
         {children}
+        <Toaster position="top-center" expand={true} richColors />
       </body>
     </html>
   );
