@@ -9,7 +9,7 @@ interface ChatInputProps {
   accentColor: string;
   inputRef: RefObject<HTMLInputElement | null>;
   onInputChange: (val: string) => void;
-  onSend: () => void;
+  onSend: (val: string) => void;
 }
 
 export function ChatInput({
@@ -30,7 +30,7 @@ export function ChatInput({
             type="text"
             value={input}
             onChange={(e) => onInputChange(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && onSend()}
+            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && onSend(input)}
             placeholder={
               isComplete ? "Session Finalized" : "Compose your message…"
             }
@@ -50,7 +50,7 @@ export function ChatInput({
             boxShadow: `0 10px 20px -5px ${accentColor}44`,
           }}
           whileTap={{ scale: 0.9 }}
-          onClick={onSend}
+          onClick={() => onSend(input)}
           disabled={!input.trim() || isComplete || isTyping}
           className="w-13 h-13 rounded-2xl flex items-center justify-center transition-all duration-300 disabled:opacity-30 disabled:grayscale group"
           style={{ backgroundColor: accentColor }}

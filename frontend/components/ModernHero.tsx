@@ -25,10 +25,10 @@ export const ModernHero = () => {
       </div>
       <div className="space-y-8 z-10 text-center absolute px-6">
         <h1 className="font-semibold text-5xl md:text-7xl whitespace-pre-wrap leading-tight tracking-tighter">
-          <span className="italic text-4xl md:text-6xl font-thin block mb-2 opacity-80">
+          <span className="italic text-4xl md:text-6xl font-thin block mb-2 opacity-80 decoration-accent/10 underline underline-offset-8">
             Stop Losing Jobs
           </span>
-          to <span className="text-accent">Slow Follow-Up</span>
+          to <span className="text-accent">Slow Lead Response</span>
         </h1>
         <p className="text-lg md:text-xl text-primary/60 max-w-2xl mx-auto leading-relaxed font-medium">
           AutomEdge responds to every HVAC lead in under 60 seconds — qualifies,

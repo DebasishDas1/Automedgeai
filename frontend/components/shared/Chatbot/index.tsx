@@ -75,20 +75,18 @@ export function Chatbot({ vertical = "general" }: ChatbotProps) {
   );
 
   // ── Form submit ────────────────────────────────────────────────────────────
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userInfo.name || !userInfo.email || !userInfo.phone) return;
-
+  const handleFormSubmit = async (data: UserInfo) => {
+    setUserInfo(data);
     setIsSubmitting(true);
     try {
-      const data = await startChatSession(apiVertical, userInfo);
-      setSession(data.session_id);
+      const resp = await startChatSession(apiVertical, data);
+      setSession(resp.session_id);
 
       setTimeout(() => {
         setMessages([
           {
             id: uid(),
-            text: `Hi ${userInfo.name.split(" ")[0]}! ${cfg.initialMessage}`,
+            text: `Hi ${data.name.split(" ")[0]}! ${cfg.initialMessage}`,
             sender: "bot",
             quickReplies: cfg.quickReplies,
           },
@@ -108,10 +106,11 @@ export function Chatbot({ vertical = "general" }: ChatbotProps) {
     setMessages([]);
     setSessionId(null);
     sessionIdRef.current = null;
+    isTypingRef.current = false;
+    isCompleteRef.current = false;
     setUserInfo({ name: "", email: "", phone: "" });
     setStep("form");
     setIsComplete(false);
-    isCompleteRef.current = false;
     sessionInit.current = false;
   }, []);
 
@@ -120,10 +119,8 @@ export function Chatbot({ vertical = "general" }: ChatbotProps) {
   const isCompleteRef = useRef(false);
 
   const handleSend = useCallback(
-    async (text?: unknown) => {
-      // 🛡️ Bulletproof input normalization
-      const raw = typeof text === "string" ? text : input;
-      const msg = (raw ?? "").toString().trim();
+    async (textOverride?: string) => {
+      const msg = (textOverride ?? "").trim();
 
       if (!msg) return;
       if (isCompleteRef.current || isTypingRef.current) return;
@@ -133,6 +130,8 @@ export function Chatbot({ vertical = "general" }: ChatbotProps) {
         ...prev,
         { id: uid(), text: msg, sender: "user" },
       ]);
+      
+      // Clear input state
       setInput("");
 
       setIsTyping(true);
@@ -185,7 +184,7 @@ export function Chatbot({ vertical = "general" }: ChatbotProps) {
         isTypingRef.current = false;
       }
     },
-    [input, apiVertical, addBotMsg, resetChat],
+    [apiVertical, addBotMsg, resetChat],
   );
 
   return (
@@ -227,8 +226,7 @@ export function Chatbot({ vertical = "general" }: ChatbotProps) {
                     userInfo={userInfo}
                     isSubmitting={isSubmitting}
                     accentColor={accentColor}
-                    onUserInfoChange={setUserInfo}
-                    onSubmit={handleFormSubmit}
+                    onFormComplete={handleFormSubmit}
                   />
                 ) : (
                   <motion.div

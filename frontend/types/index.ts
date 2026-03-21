@@ -1,4 +1,4 @@
-export type VerticalType = 'hvac' | 'roofing' | 'plumbing' | 'pest-control';
+export type VerticalType = 'hvac' | 'roofing' | 'plumbing' | 'pest_control';
 
 export interface Lead {
   id: string;

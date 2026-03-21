@@ -65,12 +65,16 @@ export function Footer() {
             </p>
 
             <div className="flex flex-col gap-6 pt-4">
-              <div className="flex items-center gap-4 text-muted-foreground font-bold hover:text-accent transition-colors">
+              <a 
+                href="mailto:team@automedge.com"
+                className="flex items-center gap-4 text-muted-foreground font-bold hover:text-accent transition-colors"
+                aria-label="Send email to team@automedge.com"
+              >
                 <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
                   <Mail size={20} />
                 </div>
-                team@automedge.com
-              </div>
+                Contact Support
+              </a>
               <div className="flex items-center gap-4 text-muted-foreground font-bold">
                 <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
                   <MapPin size={20} />
@@ -109,9 +113,9 @@ export function Footer() {
 
           <div className="flex flex-col items-center">
             {/* Main Big Lettering */}
-            <h1 className="w-full text-center text-[10vw] font-outfit font-black tracking-tighter leading-none bg-linear-to-b from-foreground/5 via-foreground/20 to-foreground/60 bg-clip-text text-transparent select-none opacity-20 transform scale-[1.1]">
+            <div className="w-full text-center text-[10vw] font-outfit font-black tracking-tighter leading-none bg-linear-to-b from-foreground/5 via-foreground/20 to-foreground/60 bg-clip-text text-transparent select-none opacity-20 transform scale-[1.1]">
               AutomEdge
-            </h1>
+            </div>
 
             {/* Sub-Footer Controls */}
             <div className="w-full flex flex-col md:flex-row items-center justify-between gap-8 mt-16 text-muted-foreground font-bold text-xs uppercase tracking-[0.2em]">

@@ -1,0 +1,20 @@
+# Automedge - AI Lead Automation
+
+Automedge is a specialized AI platform for home service companies (HVAC, Roofing, Plumbing, Pest Control) that captures every lead and follows up automatically in under 60 seconds.
+
+## Core Features
+- 24/7 AI Lead Response via SMS, WhatsApp, and Web
+- Native Integrations with ServiceTitan, Jobber, and Housecall Pro
+- Automatic Appointment Booking and Lead Qualification
+- Real-time Analytics Dashboard
+
+## Verticals
+- HVAC
+- Roofing
+- Plumbing
+- Pest Control
+
+## Contact
+- URL: https://automedge.com
+- Email: team@automedge.com
+- Location: Austin, TX

@@ -4,9 +4,9 @@ import { Footer } from "@/components/ui/large-name-footer";
 import { Mail, LifeBuoy, Send } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Contact Us | Automedge",
+  title: "Contact the Automedge Team | Support & Sales for Service Automation",
   description:
-    "Get in touch with the Automedge team. We're here to help you automate your service business.",
+    "Get in touch with the Automedge team. We're here to help HVAC, Roofing, and Plumbing businesses automate their leads and bookings.",
 };
 
 export default function ContactPage() {
@@ -45,7 +45,7 @@ export default function ContactPage() {
                 href="mailto:hello@automedge.com"
                 className="text-accent font-bold hover:underline text-lg inline-block"
               >
-                hello@automedge.com
+                Email Sales Team
               </a>
             </div>
 
@@ -63,7 +63,7 @@ export default function ContactPage() {
                 href="mailto:support@automedge.com"
                 className="text-primary font-bold hover:underline text-lg inline-block"
               >
-                support@automedge.com
+                Email Technical Support
               </a>
             </div>
           </div>

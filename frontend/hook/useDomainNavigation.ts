@@ -40,16 +40,50 @@ export const getCurrentSubdomain = () => {
 
 
 
+import { useRouter } from "next/navigation";
+
 export const useDomainNavigation = () => {
+  const router = useRouter();
+
+  const getTargetInfo = (subdomain?: string) => {
+    if (typeof window === "undefined") return { url: "/", isExternal: false };
+
+    const host = window.location.hostname;
+    const protocol = window.location.protocol;
+    const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN;
+
+    if (!root) return { url: "/", isExternal: false };
+
+    // LOCALHOST logic (dev)
+    if (isLocalhost(host)) {
+      const path = subdomain ? `/${subdomain}` : "/";
+      return { url: path, isExternal: false };
+    }
+
+    // PRODUCTION logic
+    const currentSubdomain = getCurrentSubdomain();
+
+    // If already on the target subdomain, it's internal navigation
+    if (currentSubdomain === (subdomain || null)) {
+      return { url: "/", isExternal: false };
+    }
+
+    // If navigating to root or another subdomain
+    const url = subdomain 
+      ? `${protocol}//${subdomain}.${root}`
+      : `${protocol}//${root}`;
+
+    return { url, isExternal: true };
+  };
+
   const goTo = (subdomain?: string) => {
-    const target = getDomainUrl(subdomain);
+    const { url, isExternal } = getTargetInfo(subdomain);
 
-    if (!target) return;
-
-    // Avoid unnecessary reload
-    if (window.location.href === target) return;
-
-    window.location.assign(target); // better than href
+    if (isExternal) {
+      window.location.assign(url);
+    } else {
+      router.push(url);
+    }
   };
 
   const goToDemo = (industry: string) => {

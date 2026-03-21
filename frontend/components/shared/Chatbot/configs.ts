@@ -55,5 +55,7 @@ export const CONFIGS: Record<
   },
 };
 
-let _id = 0;
-export const uid = () => `m${++_id}`;
+export const uid = () => 
+  typeof crypto !== 'undefined' && crypto.randomUUID 
+    ? crypto.randomUUID() 
+    : Math.random().toString(36).substring(2, 11);

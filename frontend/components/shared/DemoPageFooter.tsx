@@ -11,9 +11,9 @@ export const DemoPageFooter = () => {
         <div className="flex flex-col items-center">
           {/* Main Massive Branding - Stylized as an ambient backdrop */}
           <div className="relative mb-16 select-none pointer-events-none">
-            <h1 className="w-full text-center text-[10vw] font-outfit font-black tracking-tighter leading-none bg-linear-to-b from-foreground/5 via-foreground/20 to-foreground/60 bg-clip-text text-transparent select-none opacity-20 transform scale-[1.1]">
+            <div className="w-full text-center text-[10vw] font-outfit font-black tracking-tighter leading-none bg-linear-to-b from-foreground/5 via-foreground/20 to-foreground/60 bg-clip-text text-transparent select-none opacity-20 transform scale-[1.1]">
               AutomEdge
-            </h1>
+            </div>
           </div>
 
           <div className="w-full flex flex-col lg:flex-row items-center justify-between gap-10 text-primary/60">

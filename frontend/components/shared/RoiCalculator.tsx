@@ -48,7 +48,7 @@ export const RoiCalculator = ({
   // States with intelligent defaults for trade businesses
   const [leads, setLeads] = useState<number>(defaultLeads);
   const [ticketValue, setTicketValue] = useState<number>(defaultTicketValue);
-  const [closeRate, setCloseRate] = useState<number>(30); // Percentage
+  const [closeRate, setCloseRate] = useState<number>(defaultCloseRate); // Percentage
 
   // Calculations
   const calculations = useMemo(() => {

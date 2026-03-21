@@ -71,7 +71,7 @@ export function DemoPageHero({
             </button>
           </div>
 
-          <Badge className="flex items-center gap-2 px-6 py-3 text-sm md:text-base font-bold mt-8 bg-accent/10 border-accent/20 text-accent rounded-full">
+          <Badge className="flex items-center gap-2 px-6 py-3 text-sm md:text-base font-bold mt-8 bg-accent/5 border-accent/20 text-accent rounded-full">
             <Flame className="w-5 h-5 text-accent shrink-0" />
             Every hour without this, a lead goes to whoever responds faster
           </Badge>
