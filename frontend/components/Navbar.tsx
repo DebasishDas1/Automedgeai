@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { useDomainNavigation } from "@/hook/useDomainNavigation";
 
 const navItems = [
-  { title: "The Problem", href: "#problem" },
-  { title: "How It Works", href: "#how-it-works" },
-  { title: "The Solution", href: "#solution" },
-  { title: "The Engine", href: "#the-engine" },
-  { title: "Impact", href: "#impact" },
+  { title: "The Problem", href: "/#problem" },
+  { title: "How It Works", href: "/#how-it-works" },
+  { title: "The Solution", href: "/#solution" },
+  { title: "The Engine", href: "/#the-engine" },
+  { title: "Impact", href: "/#impact" },
 ];
 
 export function Navbar() {
@@ -60,7 +60,7 @@ export function Navbar() {
         </div>
 
         {/* CTA */}
-        <Link href="#contact">
+        <Link href="/#contact">
           <Button className="w-full py-6 bg-cta glow-cta text-black font-bold shadow-xl rounded-2xl hover:bg-cta-hover">
             Get a Free Demo
           </Button>

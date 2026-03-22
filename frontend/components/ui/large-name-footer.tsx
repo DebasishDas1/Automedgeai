@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Icons } from "@/components/ui/icons";
 import Image from "next/image";
 import { Mail, MapPin } from "lucide-react";
 
@@ -13,14 +12,15 @@ const FOOTER_LINKS = {
     { label: "Pest Control", href: "/demo-pest-control" },
   ],
   Platform: [
-    { label: "The Engine", href: "#the-engine" },
-    { label: "How it Works", href: "#how-it-works" },
-    { label: "ROI Calculator", href: "#roi" },
-    { label: "Success Stories", href: "#impact" },
+    { label: "How it Works", href: "/#how-it-works" },
+    { label: "The Engine", href: "/#the-engine" },
+    { label: "Impact", href: "/#impact" },
+    { label: "Book a Demo", href: "/#contact" },
   ],
   Legal: [
     { label: "Privacy Policy", href: "/privacy-policy" },
     { label: "Terms of Service", href: "/tos" },
+    { label: "advertisement", href: "/ads" },
   ],
 };
 
@@ -65,7 +65,7 @@ export function Footer() {
             </p>
 
             <div className="flex flex-col gap-6 pt-4">
-              <a 
+              <a
                 href="mailto:team@automedge.com"
                 className="flex items-center gap-4 text-muted-foreground font-bold hover:text-accent transition-colors"
                 aria-label="Send email to team@automedge.com"

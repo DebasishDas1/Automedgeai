@@ -95,10 +95,11 @@ export const DemoPageCalendar = ({
 
     try {
       await createBooking({
-        name:     formData.name,
-        email:    formData.email,
-        business: formData.website || "No Business Listed",
-        vertical: type,
+        name:         formData.name,
+        email:        formData.email,
+        business:      formData.website || "No Business Listed",
+        vertical:      type,
+        scheduled_at:  selectedSlot ? selectedSlot.toISOString() : new Date().toISOString(),
       });
       setBookingStep("success");
     } catch (err) {
