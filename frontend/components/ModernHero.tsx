@@ -20,7 +20,7 @@ export const ModernHero = () => {
   const { goTo } = useDomainNavigation();
   return (
     <section className="relative pt-24 md:pt-28 min-h-[720px] md:min-h-[880px] lg:min-h-[95vh] w-full flex flex-col items-center justify-center overflow-hidden bg-background transition-colors duration-500">
-      <div className="absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0 hidden md:block">
         <GLSLHills />
       </div>
       <div className="space-y-8 z-10 text-center absolute px-6">
@@ -35,7 +35,7 @@ export const ModernHero = () => {
           books, and follows up automatically. No extra staff.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-5 items-center justify-center">
+        <div className="flex flex-col sm:flex-row gap-5 items-center justify-center font-bold">
           <Link
             href="/demo-hvac"
             onClick={(e) => {
@@ -43,7 +43,7 @@ export const ModernHero = () => {
               goTo("demo-hvac");
             }}
             aria-label="See HVAC Demo Live"
-            className="w-full sm:w-auto flex items-center justify-center gap-3 bg-accent text-primary px-10 py-5 rounded-2xl font-black hover:scale-[1.05] active:scale-95 transition-all shadow-[0_20px_50px_rgba(0,194,168,0.3)] group"
+            className="w-full sm:w-auto flex items-center justify-center gap-3 bg-accent text-secondary px-10 py-5 rounded-2xl font-black hover:scale-[1.05] active:scale-95 transition-all group"
           >
             <Zap className="w-5 h-5 group-hover:rotate-12 transition-transform" />
             See it Live - Free Demo

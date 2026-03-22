@@ -81,6 +81,7 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+import { LazyMotion, domMax } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 export default function RootLayout({
@@ -105,54 +106,56 @@ export default function RootLayout({
           "[word-break:break-word]",
         )}
       >
-        <Script
-          id="json-ld"
-          type="application/ld+json"
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify([
-              {
-                "@context": "https://schema.org",
-                "@type": "Organization",
-                "name": "Automedge",
-                "url": "https://automedge.com",
-                "logo": "https://automedge.com/AutomEdge-logo.png",
-                "description": "24/7 AI Lead Automation for HVAC, Roofing, Plumbing, and Pest Control businesses.",
-                "sameAs": ["https://twitter.com/automedge", "https://linkedin.com/company/automedge"],
-              },
-              {
-                "@context": "https://schema.org",
-                "@type": "LocalBusiness",
-                "name": "Automedge AI",
-                "image": "https://automedge.com/hvac.png",
-                "address": {
-                  "@type": "PostalAddress",
-                  "addressLocality": "Austin",
-                  "addressRegion": "TX",
-                  "addressCountry": "US"
+        <LazyMotion features={domMax} strict>
+          <Script
+            id="json-ld"
+            type="application/ld+json"
+            strategy="afterInteractive"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify([
+                {
+                  "@context": "https://schema.org",
+                  "@type": "Organization",
+                  "name": "Automedge",
+                  "url": "https://automedge.com",
+                  "logo": "https://automedge.com/AutomEdge-logo.png",
+                  "description": "24/7 AI Lead Automation for HVAC, Roofing, Plumbing, and Pest Control businesses.",
+                  "sameAs": ["https://twitter.com/automedge", "https://linkedin.com/company/automedge"],
                 },
-                "geo": {
-                  "@type": "GeoCoordinates",
-                  "latitude": 30.2672,
-                  "longitude": -97.7431
-                },
-                "url": "https://automedge.com",
-                "telephone": "+15125550199",
-                "priceRange": "$$",
-                "openingHoursSpecification": {
-                  "@type": "OpeningHoursSpecification",
-                  "dayOfWeek": [
-                    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
-                  ],
-                  "opens": "00:00",
-                  "closes": "23:59"
+                {
+                  "@context": "https://schema.org",
+                  "@type": "LocalBusiness",
+                  "name": "Automedge AI",
+                  "image": "https://automedge.com/hvac.png",
+                  "address": {
+                    "@type": "PostalAddress",
+                    "addressLocality": "Austin",
+                    "addressRegion": "TX",
+                    "addressCountry": "US"
+                  },
+                  "geo": {
+                    "@type": "GeoCoordinates",
+                    "latitude": 30.2672,
+                    "longitude": -97.7431
+                  },
+                  "url": "https://automedge.com",
+                  "telephone": "+15125550199",
+                  "priceRange": "$$",
+                  "openingHoursSpecification": {
+                    "@type": "OpeningHoursSpecification",
+                    "dayOfWeek": [
+                      "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
+                    ],
+                    "opens": "00:00",
+                    "closes": "23:59"
+                  }
                 }
-              }
-            ]),
-          }}
-        />
-        {children}
-        <Toaster position="top-center" expand={true} richColors />
+              ]),
+            }}
+          />
+          {children}
+          <Toaster position="top-center" expand={true} richColors />
+        </LazyMotion>
       </body>
     </html>
   );

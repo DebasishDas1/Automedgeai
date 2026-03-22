@@ -22,6 +22,8 @@ const GLSLHills = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) return;
+
     class Plane {
       uniforms: any;
       mesh: THREE.Mesh;

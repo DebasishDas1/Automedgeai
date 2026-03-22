@@ -6,7 +6,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { useDomainNavigation } from "@/hook/useDomainNavigation";
 import { Menu, X, ChevronRight } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m as motion, AnimatePresence } from "framer-motion";
 
 const NAV_LINKS = [
   { label: "How it Works", href: "#how-it-works" },

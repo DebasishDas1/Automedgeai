@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { m as motion } from "framer-motion";
 import { CheckCircle2, Video } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";

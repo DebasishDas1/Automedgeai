@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { m as motion } from "framer-motion";
 import {
   Zap,
   Bot,
@@ -14,49 +14,59 @@ import {
 
 const steps = [
   {
-    number: "01",
     icon: MousePointerClick,
     title: "Lead Capture",
-    description: "Multi-source lead ingestion from web forms, ads, and voice calls.",
-    color: "from-amber-400 to-yellow-500",
-    shadow: "shadow-amber-400/20",
-    iconColor: "text-amber-500",
+    description:
+      "Multi-source lead ingestion from web forms, ads, and voice calls.",
+    color: "from-blue-400 to-indigo-500",
+    shadow: "shadow-blue-400/20",
+    iconColor: "text-blue-500",
+    bgColor: "bg-blue-400/5",
+    dropShadow: "drop-shadow-[0_2px_4px_rgba(96,165,250,0.3)]",
   },
   {
-    number: "02",
     icon: Bot,
     title: "AI Analysis",
-    description: "Instant qualification and triage based on urgency and issue type.",
-    color: "from-amber-400 to-yellow-500",
-    shadow: "shadow-amber-400/20",
-    iconColor: "text-amber-500",
+    description:
+      "Instant qualification and triage based on urgency and issue type.",
+    color: "from-purple-400 to-violet-500",
+    shadow: "shadow-purple-400/20",
+    iconColor: "text-purple-500",
+    bgColor: "bg-purple-400/5",
+    dropShadow: "drop-shadow-[0_2px_4px_rgba(167,139,250,0.3)]",
   },
   {
-    number: "03",
     icon: CalendarCheck2,
     title: "Smart Booking",
-    description: "Deep CRM integration for real-time calendar availability and booking.",
-    color: "from-amber-400 to-yellow-500",
-    shadow: "shadow-amber-400/20",
-    iconColor: "text-amber-500",
+    description:
+      "Deep CRM integration for real-time calendar availability and booking.",
+    color: "from-emerald-400 to-teal-500",
+    shadow: "shadow-emerald-400/20",
+    iconColor: "text-emerald-500",
+    bgColor: "bg-emerald-400/5",
+    dropShadow: "drop-shadow-[0_2px_4px_rgba(52,211,153,0.3)]",
   },
   {
-    number: "04",
     icon: Clock,
     title: "Auto Follow-up",
-    description: "Multi-touch nurturing for leads who aren't ready to book immediately.",
-    color: "from-amber-400 to-yellow-500",
-    shadow: "shadow-amber-400/20",
-    iconColor: "text-amber-500",
+    description:
+      "Multi-touch nurturing for leads who aren't ready to book immediately.",
+    color: "from-rose-400 to-pink-500",
+    shadow: "shadow-rose-400/20",
+    iconColor: "text-rose-500",
+    bgColor: "bg-rose-400/5",
+    dropShadow: "drop-shadow-[0_2px_4px_rgba(251,113,133,0.3)]",
   },
   {
-    number: "05",
     icon: Star,
     title: "Review Gen",
-    description: "Post-job satisfaction checks and automated Google review requests.",
+    description:
+      "Post-job satisfaction checks and automated Google review requests.",
     color: "from-amber-400 to-yellow-500",
     shadow: "shadow-amber-400/20",
     iconColor: "text-amber-500",
+    bgColor: "bg-amber-400/5",
+    dropShadow: "drop-shadow-[0_2px_4px_rgba(251,191,36,0.3)]",
   },
 ];
 
@@ -112,7 +122,7 @@ export const HowItWorks = () => {
 
           {steps.map((step, i) => (
             <motion.div
-              key={step.number}
+              key={i}
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -141,13 +151,6 @@ export const HowItWorks = () => {
                       className={`absolute inset-0 bg-linear-to-br ${step.color} opacity-0 group-hover:opacity-5 rounded-[32px] transition-opacity`}
                     />
                   </div>
-
-                  {/* Number Badge */}
-                  <div className="absolute -top-3 -right-3 w-10 h-10 rounded-full bg-slate-900 dark:bg-white flex items-center justify-center border-4 border-slate-100 dark:border-slate-950 shadow-xl z-10 transition-transform duration-500 group-hover:scale-110">
-                    <span className="text-[11px] font-black text-white dark:text-slate-950 tracking-tighter">
-                      {step.number}
-                    </span>
-                  </div>
                 </div>
 
                 <div className="text-center px-4 space-y-4">
@@ -163,7 +166,9 @@ export const HowItWorks = () => {
                 {i < steps.length - 1 && (
                   <div className="relative lg:absolute lg:-right-8 lg:top-[100px] mt-8 lg:mt-0 z-20 flex items-center justify-center">
                     {/* Desktop Arrow */}
-                    <div className="hidden lg:block text-amber-400 transition-colors">
+                    <div
+                      className={`hidden lg:block text-amber-400 transition-colors`}
+                    >
                       <ArrowRight
                         size={32}
                         strokeWidth={3}
@@ -184,7 +189,9 @@ export const HowItWorks = () => {
               </div>
 
               {/* Hover Glow Plate */}
-              <div className="absolute inset-0 bg-amber-400/5 rounded-[40px] opacity-0 group-hover:opacity-100 transition-all duration-500 -z-10 blur-xl scale-95 group-hover:scale-105" />
+              <div
+                className={`absolute inset-0 ${step.bgColor} rounded-[40px] opacity-0 group-hover:opacity-100 transition-all duration-500 -z-10 blur-xl scale-95 group-hover:scale-105`}
+              />
             </motion.div>
           ))}
         </div>

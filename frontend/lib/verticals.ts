@@ -37,8 +37,8 @@ export const VERTICALS: Record<string, Vertical> = {
             source: 'Phone'
         }
     },
-    'pest-control': {
-        slug: 'pest-control',
+    pest_control: {
+        slug: 'pest_control',
         label: 'Pest Control',
         pain: 'Recurring clients churn silently',
         fix: 'Auto re-booking sequences 30 days before renewal',

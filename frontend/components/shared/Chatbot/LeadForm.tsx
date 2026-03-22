@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { motion } from "framer-motion";
+import { m as motion } from "framer-motion";
 import { User, Mail, Phone, ArrowRight, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { UserInfo } from "./types";
 import { Button } from "@/components/ui/button";

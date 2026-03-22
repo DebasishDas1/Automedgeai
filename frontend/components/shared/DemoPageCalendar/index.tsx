@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m as motion, AnimatePresence } from "framer-motion";
 import { Calendar as CalendarIcon, Check } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Card } from "@/components/ui/card";
