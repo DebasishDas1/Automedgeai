@@ -6,6 +6,7 @@ import { DemoPageNavbar } from "@/components/shared/DemoPageNavbar";
 import { DemoPageHero } from "@/components/shared/DemoPageHero";
 import { DemoPageFooter } from "@/components/shared/DemoPageFooter";
 import { ChatbotWrapper } from "@/components/shared/ChatbotWrapper";
+import { CallAgent } from "@/components/shared/CallAgent";
 
 const DemoPageCalendar = dynamic(() =>
   import("@/components/shared/DemoPageCalendar").then(
@@ -117,6 +118,7 @@ export default function HvacLandingPage() {
   return (
     <main className="min-h-screen">
       <DemoPageNavbar />
+      <CallAgent type={"hvac"} />
 
       <DemoPageHero
         title="See How HVAC Companies Book"

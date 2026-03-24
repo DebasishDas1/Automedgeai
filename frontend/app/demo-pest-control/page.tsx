@@ -6,6 +6,7 @@ import { DemoPageNavbar } from "@/components/shared/DemoPageNavbar";
 import { DemoPageHero } from "@/components/shared/DemoPageHero";
 import { DemoPageFooter } from "@/components/shared/DemoPageFooter";
 import { ChatbotWrapper } from "@/components/shared/ChatbotWrapper";
+import { CallAgent } from "@/components/shared/CallAgent";
 
 const DemoFullSystem = dynamic(() =>
   import("@/components/shared/DemoFullSystem").then(
@@ -126,6 +127,7 @@ export default function PestControlPage() {
   return (
     <main className="min-h-screen">
       <DemoPageNavbar />
+      <CallAgent type={"pest_control"} />
 
       <DemoPageHero
         title="Pest Leads Are Urgent."

@@ -6,6 +6,7 @@ import { DemoPageNavbar } from "@/components/shared/DemoPageNavbar";
 import { DemoPageHero } from "@/components/shared/DemoPageHero";
 import { DemoPageFooter } from "@/components/shared/DemoPageFooter";
 import { ChatbotWrapper } from "@/components/shared/ChatbotWrapper";
+import { CallAgent } from "@/components/shared/CallAgent";
 
 const DemoFullSystem = dynamic(() =>
   import("@/components/shared/DemoFullSystem").then(
@@ -142,6 +143,7 @@ export default function RoofingPage() {
   return (
     <main className="min-h-screen">
       <DemoPageNavbar />
+      <CallAgent type={"roofing"} />
 
       <DemoPageHero
         title="Storm Season Leads Have a"
