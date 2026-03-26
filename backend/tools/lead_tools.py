@@ -1,4 +1,4 @@
-# services/lead_service.py
+# services/lead_tools.py
 import logging
 from uuid import UUID
 
@@ -31,7 +31,7 @@ async def create_lead(db: AsyncSession, data: LeadCreate) -> LeadResponse:
 async def upsert_from_chat(db: AsyncSession, session_id: str, state: dict) -> LeadResponse:
     """
     Create or update a lead from a completed chat session state.
-    Called by workflow_service after post-chat graph finishes.
+    Called by workflow_tools after post-chat graph finishes.
     """
     # Try to find existing row for this session
     result = await db.execute(select(Lead).where(Lead.session_id == session_id))

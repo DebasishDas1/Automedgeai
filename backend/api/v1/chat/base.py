@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
-from services import workflow_service
+from tools import workflow_tools
 from workflows.registry import registry
 
 logger = structlog.get_logger(__name__)
@@ -74,7 +74,7 @@ async def handle_start(vertical: Vertical, body: StartRequest, db) -> dict:
     ValueError as 400 so callers get actionable errors (e.g. invalid vertical).
     """
     try:
-        return await workflow_service.start_session(
+        return await workflow_tools.start_session(
             db=db,
             vertical=vertical,
             name=body.name,
@@ -95,7 +95,7 @@ async def handle_message(body: MessageRequest, db) -> dict:
     Process a user message in an existing session.
     """
     try:
-        return await workflow_service.send_message(
+        return await workflow_tools.send_message(
             db=db,
             session_id=body.session_id,
             user_msg=body.message,
@@ -183,7 +183,7 @@ async def handle_message_stream(body: MessageRequest, db) -> StreamingResponse:
         if final_output is not None:
             try:
                 async with get_db_context() as fresh_db:
-                    await workflow_service._save_session(fresh_db, body.session_id, final_output)
+                    await workflow_tools._save_session(fresh_db, body.session_id, final_output)
             except Exception as exc:
                 logger.error(
                     "stream_save_failed",

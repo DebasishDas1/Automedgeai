@@ -1,4 +1,4 @@
-# services/whatsapp_service.py
+# services/whatsapp_tools.py
 # Twilio WhatsApp notifications — confirmation to user + alert to team.
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ logger = structlog.get_logger(__name__)
 _TWILIO_WA_FROM = "whatsapp:+14155238886"  # Twilio sandbox default
 
 
-class WhatsAppService:
+class WhatsAppTools:
 
     def _client(self):
         try:
@@ -111,4 +111,4 @@ class WhatsAppService:
             logger.error("whatsapp_team_failed", error=str(exc))
 
 
-whatsapp_service = WhatsAppService()
+whatsapp_tools = WhatsAppTools()

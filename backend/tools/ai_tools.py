@@ -1,4 +1,4 @@
-# services/ai_service.py
+# services/ai_tools.py
 from __future__ import annotations
 
 import structlog
@@ -81,7 +81,7 @@ hot=urgent+contact info, warm=interested+incomplete, cold=browsing, drop=spam.
 """
 
 
-class AIService:
+class AITools:
 
     async def extract_fields(self, last_user_message: str) -> dict | None:
         log = logger.bind(service="extract_fields")
@@ -255,4 +255,4 @@ class AIService:
             return None
 
 
-ai_service = AIService()
+ai_tools = AITools()

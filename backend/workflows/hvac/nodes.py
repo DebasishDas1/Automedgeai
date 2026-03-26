@@ -10,7 +10,7 @@ from langchain_core.messages import SystemMessage
 
 from core.database import Lead, get_db_context
 from llm import llm
-from services.ai_service import ai_service
+from tools.ai_tools import ai_tools
 from workflows.base import build_lc_messages, field_missing, get_appt_slots
 from workflows.hvac.prompts import HVAC_EXPERT_SYSTEM
 from workflows.hvac.schema import LeadEnrichment, LeadScore
@@ -88,7 +88,7 @@ async def node_enrich_lead(state: HvacState) -> HvacState:
     # A. Extract contact fields from last user message only
     if last_user:
         try:
-            extraction = await ai_service.extract_fields(last_user)
+            extraction = await ai_tools.extract_fields(last_user)
             if extraction:
                 _safe_merge(state, "name",         extraction.get("name"))
                 _safe_merge(state, "email",        extraction.get("email"))
@@ -107,7 +107,7 @@ async def node_enrich_lead(state: HvacState) -> HvacState:
 
     # B. Classify full history — assessment only, not a collected field
     try:
-        classification = await ai_service.classify_conversation(messages)
+        classification = await ai_tools.classify_conversation(messages)
         if classification:
             state["intent"]     = classification.get("intent", "service_request")
             state["is_spam"]    = classification.get("is_spam", False)
@@ -215,7 +215,7 @@ async def node_score_lead(state: HvacState) -> HvacState:
     )
 
     try:
-        score_data: LeadScore = await ai_service.score_lead(snapshot)
+        score_data: LeadScore = await ai_tools.score_lead(snapshot)
         state["score"]        = score_data.score
         state["score_reason"] = score_data.score_reason
         state["next_step"]    = score_data.next_step
@@ -267,7 +267,7 @@ async def node_finalize_and_deliver(state: HvacState) -> HvacState:
 
     # 2. Sheets + Email + WhatsApp via delivery pipeline
     try:
-        from services.delivery_tools import run_delivery_pipeline
+        from tools.delivery_tools import run_delivery_pipeline
         results = await run_delivery_pipeline(state)
         state["delivery_results"] = results
     except Exception as exc:

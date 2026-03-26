@@ -99,7 +99,7 @@ class Booking(Base):
 class WorkflowEvent(Base):
     """
     One row per workflow step for a lead.
-    Consumed by workflow_trigger_service SSE stream for the dashboard.
+    Consumed by workflow_trigger_tools SSE stream for the dashboard.
     Matches WorkflowEventResponse in models/workflow.py exactly.
     """
     __tablename__ = "workflow_events"

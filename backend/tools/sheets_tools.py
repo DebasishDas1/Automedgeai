@@ -1,4 +1,4 @@
-# services/sheets_service.py
+# services/sheets_tools.py
 # Google Sheets delivery — 3 tabs: Hot Leads / Warm Leads / Cold Leads
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ logger = structlog.get_logger(__name__)
 _SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 
-def _get_service():
+def _get_tools():
     """Build Sheets API client from JSON env var."""
     try:
         from google.oauth2.service_account import Credentials
@@ -34,7 +34,7 @@ def _get_service():
     return build("sheets", "v4", credentials=creds)
 
 
-class SheetsService:
+class SheetsTools:
 
     async def append_lead(
         self,
@@ -54,7 +54,7 @@ class SheetsService:
             raise
 
     def _append_sync(self, sheet_id: str, tab_name: str, row_data: list[Any]) -> None:
-        svc = _get_service()
+        svc = _get_tools()
         # Ensure tab exists
         try:
             meta = svc.spreadsheets().get(spreadsheetId=sheet_id).execute()
@@ -88,4 +88,4 @@ class SheetsService:
         ).execute()
 
 
-sheets_service = SheetsService()
+sheets_tools = SheetsTools()

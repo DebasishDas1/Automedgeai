@@ -9,7 +9,7 @@ from langchain_core.messages import SystemMessage
 
 from core.database import Lead, get_db_context
 from llm import llm
-from services.ai_service import ai_service
+from tools.ai_tools import ai_tools
 from workflows.base import build_lc_messages, field_missing, get_appt_slots
 from workflows.hvac.schema import LeadEnrichment, LeadScore
 from workflows.plumbing.prompts import PLUMBING_EXPERT_SYSTEM
@@ -101,7 +101,7 @@ async def node_enrich_lead(state: PlumbingState) -> PlumbingState:
     # A. Extract plumbing fields from last user message only
     if last_user:
         try:
-            extraction = await ai_service.extract_plumbing_fields(last_user)
+            extraction = await ai_tools.extract_plumbing_fields(last_user)
             if extraction:
                 _safe_merge(state, "name",             extraction.get("name"))
                 _safe_merge(state, "email",            extraction.get("email"))
@@ -127,7 +127,7 @@ async def node_enrich_lead(state: PlumbingState) -> PlumbingState:
 
     # B. Classify full history
     try:
-        classification = await ai_service.classify_conversation(messages)
+        classification = await ai_tools.classify_conversation(messages)
         if classification:
             state["intent"]     = classification.get("intent", "service_request")
             state["is_spam"]    = classification.get("is_spam", False)
@@ -264,7 +264,7 @@ async def node_score_lead(state: PlumbingState) -> PlumbingState:
     )
 
     try:
-        score_data: LeadScore = await ai_service.score_lead(snapshot)
+        score_data: LeadScore = await ai_tools.score_lead(snapshot)
         state["score"]        = score_data.score
         state["score_reason"] = score_data.score_reason
         state["next_step"]    = score_data.next_step
@@ -314,17 +314,49 @@ async def node_finalize_and_deliver(state: PlumbingState) -> PlumbingState:
 
     # 2. Sheets + Email + WhatsApp
     try:
-        from services.delivery_tools import run_delivery_pipeline
-        results = await run_delivery_pipeline(state)
-        state["delivery_results"] = results
+        from tools.delivery_tools import run_delivery_pipeline
+            
+        return Command(
+            goto="end",
+            update={"is_complete": True}
+        )
+
     except Exception as exc:
-        logger.error("plumbing_delivery_pipeline_failed", error=str(exc),
-                     session_id=state.get("session_id"))
+        logger.error(
+            "hand_off_failed",
+            session_id=state.get("session_id"),
+            error=str(exc),
+        )
+        if "messages" in state and state["messages"]:
+            # Basic fallback notification if hand-off crashes hard
+            from tools.whatsapp_tools import whatsapp_tools
+            # Reuse WhatsApp service but send as SMS (same Twilio client)
+            from core.config import settings
+            from twilio.rest import Client
+            import asyncio
+            client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+            sms_body = (
+                f"Sorry, I'm having trouble connecting you. "
+                f"Please call us directly at {settings.PLUMBER_PHONE_NUMBER}."
+            )
+            # Attempt to send SMS to the user
+            try:
+                to_number = state["phone"] if state["phone"].startswith("+") else f"+{state['phone']}"
+                await asyncio.to_thread(
+                    client.messages.create,
+                    from_=settings.TWILIO_FROM_NUMBER,
+                    to=to_number,
+                    body=sms_body,
+                )
+                logger.info("hand_off_fallback_sms_sent", session_id=state.get("session_id"))
+            except Exception as sms_exc:
+                logger.error("hand_off_fallback_sms_failed", error=str(sms_exc),
+                             session_id=state.get("session_id"))
 
     # 3. Emergency SMS — additional to WhatsApp, sent via Twilio SMS
     if _is_emergency(state) and state.get("phone"):
         try:
-            from services.whatsapp_service import whatsapp_service
+            from tools.whatsapp_tools import whatsapp_tools
             # Reuse WhatsApp service but send as SMS (same Twilio client)
             from core.config import settings
             from twilio.rest import Client

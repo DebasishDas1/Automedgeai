@@ -9,7 +9,7 @@ from langchain_core.messages import SystemMessage
 
 from core.database import Lead, get_db_context
 from llm import llm
-from services.ai_service import ai_service
+from tools.ai_tools import ai_tools
 from workflows.base import build_lc_messages, field_missing, get_appt_slots
 from workflows.hvac.schema import LeadEnrichment, LeadScore  # reuse shared schemas
 from workflows.pest_control.prompts import PEST_EXPERT_SYSTEM
@@ -85,7 +85,7 @@ async def node_enrich_lead(state: PestState) -> PestState:
     # A. Extract pest-specific fields from last user message
     if last_user:
         try:
-            extraction = await ai_service.extract_pest_fields(last_user)
+            extraction = await ai_tools.extract_pest_fields(last_user)
             if extraction:
                 # Contact fields (usually from form, but catch if stated in chat)
                 _safe_merge(state, "name",  extraction.get("name"))
@@ -112,7 +112,7 @@ async def node_enrich_lead(state: PestState) -> PestState:
 
     # B. Classify full history for assessment fields
     try:
-        classification = await ai_service.classify_conversation(messages)
+        classification = await ai_tools.classify_conversation(messages)
         if classification:
             state["intent"]     = classification.get("intent", "service_request")
             state["is_spam"]    = classification.get("is_spam", False)
@@ -227,7 +227,7 @@ async def node_score_lead(state: PestState) -> PestState:
     )
 
     try:
-        from services.ai_service import ai_service as _ai
+        from tools.ai_tools import ai_tools as _ai
         score_data: LeadScore = await _ai.score_lead(snapshot)
         state["score"]        = score_data.score
         state["score_reason"] = score_data.score_reason
@@ -276,7 +276,7 @@ async def node_finalize_and_deliver(state: PestState) -> PestState:
 
     # 2. Sheets + Email + WhatsApp
     try:
-        from services.delivery_tools import run_delivery_pipeline
+        from tools.delivery_tools import run_delivery_pipeline
         results = await run_delivery_pipeline(state)
         state["delivery_results"] = results
     except Exception as exc:

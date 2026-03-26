@@ -1,4 +1,4 @@
-# services/email_service.py
+# services/email_tools.py
 # Resend email notifications for captured leads.
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from core.config import settings
 logger = structlog.get_logger(__name__)
 
 
-class EmailService:
+class EmailTools:
 
     def _client(self):
         try:
@@ -87,4 +87,4 @@ class EmailService:
             # Non-fatal — don't raise
 
 
-email_service = EmailService()
+email_tools = EmailTools()

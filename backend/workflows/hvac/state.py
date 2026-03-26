@@ -13,7 +13,7 @@ class HvacState(TypedDict, total=False):
     messages:      List[dict]
     turn_count:    int
     is_complete:   bool
-    # Collected contact fields — all start as None in workflow_service
+    # Collected contact fields — all start as None in workflow_tools
     name:          Optional[str]
     email:         Optional[str]
     phone:         Optional[str]

@@ -8,9 +8,9 @@ from datetime import datetime, timezone
 import structlog
 
 from core.config import settings
-from services.sheets_service import sheets_service
-from services.email_service import email_service
-from services.whatsapp_service import whatsapp_service
+from tools.sheets_tools import sheets_tools
+from tools.email_tools import email_tools
+from tools.whatsapp_tools import whatsapp_tools
 
 logger = structlog.get_logger(__name__)
 
@@ -68,7 +68,7 @@ async def store_lead(state: dict, score: str) -> bool:
     ]
 
     try:
-        await sheets_service.append_lead(
+        await sheets_tools.append_lead(
             sheet_id=sheet_id,
             tab_name=f"{score.capitalize()} Leads",
             row_data=row,
@@ -83,7 +83,7 @@ async def store_lead(state: dict, score: str) -> bool:
 
 async def send_email_notification(state: dict, score: str) -> bool:
     try:
-        await email_service.send_lead_notification(state, score)
+        await email_tools.send_lead_notification(state, score)
         return True
     except Exception as exc:
         logger.error("email_notification_failed", error=str(exc))
@@ -95,8 +95,8 @@ async def send_email_notification(state: dict, score: str) -> bool:
 async def send_whatsapp_notification(state: dict, score: str) -> bool:
     try:
         await asyncio.gather(
-            whatsapp_service.notify_user(state),
-            whatsapp_service.notify_team(state),
+            whatsapp_tools.notify_user(state),
+            whatsapp_tools.notify_team(state),
             return_exceptions=True,
         )
         return True
@@ -116,7 +116,7 @@ async def sync_to_hubspot(state: dict) -> dict:
     Returns results dict. Never raises — failure is logged and ignored.
     """
     try:
-        from services.hubspot_service import sync_lead_to_hubspot
+        from tools.hubspot_tools import sync_lead_to_hubspot
         results = await sync_lead_to_hubspot(state)
         logger.info("hubspot_sync_ok",
             contact_id=results.get("contact_id"),

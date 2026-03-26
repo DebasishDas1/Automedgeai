@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
 from models.lead import LeadCreate, LeadUpdate, LeadResponse, LeadListResponse
-from services import lead_service
+from tools import lead_tools
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -16,7 +16,7 @@ router = APIRouter()
 @router.post("/", response_model=LeadResponse, status_code=201)
 async def create_lead(body: LeadCreate, db: AsyncSession = Depends(get_db)):
     try:
-        return await lead_service.create_lead(db, body)
+        return await lead_tools.create_lead(db, body)
     except Exception as e:
         logger.error(f"create_lead: {e}")
         raise HTTPException(status_code=500, detail="Failed to create lead.")
@@ -32,7 +32,7 @@ async def list_leads(
     db: AsyncSession     = Depends(get_db),
 ):
     try:
-        return await lead_service.get_leads(db, vertical, score, stage, limit, offset)
+        return await lead_tools.get_leads(db, vertical, score, stage, limit, offset)
     except Exception as e:
         logger.error(f"list_leads: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch leads.")
@@ -45,7 +45,7 @@ async def update_lead(
     db:      AsyncSession = Depends(get_db),
 ):
     try:
-        result = await lead_service.update_lead(db, lead_id, body)
+        result = await lead_tools.update_lead(db, lead_id, body)
     except Exception as e:
         logger.error(f"update_lead: {e}")
         raise HTTPException(status_code=500, detail="Failed to update lead.")

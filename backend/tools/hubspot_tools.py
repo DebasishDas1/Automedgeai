@@ -1,4 +1,4 @@
-# services/hubspot_service.py
+# services/hubspot_tools.py
 # HubSpot CRM integration — contacts, deals, and meetings.
 # Requires: uv add hubspot-api-client
 # Env vars: HUBSPOT_ACCESS_TOKEN (private app token from HubSpot settings)
@@ -195,7 +195,7 @@ async def update_contact(contact_id: str, updates: dict) -> bool:
     Pass a flat dict of HubSpot property names → values.
 
     Example:
-        await hubspot_service.update_contact(contact_id, {
+        await hubspot_tools.update_contact(contact_id, {
             "hs_lead_status": "IN_PROGRESS",
             "automedge_score": "hot",
         })
@@ -383,8 +383,8 @@ async def sync_lead_to_hubspot(state: dict) -> dict:
 
 
 # Module-level singleton-style access
-class HubSpotService:
-    """Thin wrapper so the service can be imported as hubspot_service.method()."""
+class HubSpotTools:
+    """Thin wrapper so the service can be imported as hubspot_tools.method()."""
     upsert_contact  = staticmethod(upsert_contact)
     update_contact  = staticmethod(update_contact)
     update_deal     = staticmethod(update_deal)
@@ -393,4 +393,4 @@ class HubSpotService:
     sync_lead       = staticmethod(sync_lead_to_hubspot)
 
 
-hubspot_service = HubSpotService()
+hubspot_tools = HubSpotTools()
