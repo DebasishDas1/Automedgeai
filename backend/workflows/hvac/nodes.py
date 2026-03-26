@@ -11,6 +11,7 @@ from langchain_core.messages import SystemMessage
 from core.database import Lead, get_db_context
 from llm import llm
 from tools.ai_tools import ai_tools
+from workflows.shared import build_validate_input_node, build_check_completion_node, build_chat_reply_node
 from workflows.base import build_lc_messages, field_missing, get_appt_slots
 from workflows.hvac.prompts import HVAC_EXPERT_SYSTEM
 from workflows.hvac.schema import LeadEnrichment, LeadScore
@@ -134,65 +135,12 @@ async def node_enrich_lead(state: HvacState) -> HvacState:
 
 # ── 3. Check completion ───────────────────────────────────────────────────────
 
-async def node_check_completion(state: HvacState) -> HvacState:
-    if state.get("is_complete"):
-        return state
-    if all(not field_missing(state, f) for f in _REQUIRED_FIELDS):
-        state["is_complete"] = True
-    return state
+node_check_completion = build_check_completion_node(_REQUIRED_FIELDS)
 
 
 # ── 4. Chat reply ─────────────────────────────────────────────────────────────
 
-async def node_chat_reply(state: HvacState) -> HvacState:
-    start = time.perf_counter()
-    state["last_node"] = "chat_reply"
-
-    # Completion turn — deterministic farewell, no LLM call
-    if state.get("is_complete"):
-        address = state.get("address") or "your location"
-        issue   = state.get("issue")   or "your issue"
-        phone   = state.get("phone")   or "the number you provided"
-        reply_content = (
-            f"Perfect — dispatching a technician to {address} for {issue}. "
-            f"Our tech will call {phone} within 15 minutes. You're all set!"
-        )
-        state["turn_count"] = int(state.get("turn_count", 0)) + 1
-        existing = list(state.get("messages", []))
-        existing.append({"role": "assistant", "content": reply_content, "ts": _utcnow()})
-        state["messages"] = existing
-        state["duration_ms"] = _elapsed(start)
-        return state
-
-    # Normal turn — LLM asks for next missing field
-    slots = state.get("appt_slots") or get_appt_slots()
-    state["appt_slots"] = slots
-
-    collected = {f: state.get(f) for f in _COLLECTED_FIELDS if state.get(f) is not None}
-    expert_prompt = HVAC_EXPERT_SYSTEM.format(collected=str(collected))
-    messages_lc = [SystemMessage(content=expert_prompt)] + build_lc_messages(state)
-
-    logger.debug("chat_reply_invoke",
-        session_id=state.get("session_id"),
-        turn=state.get("turn_count", 0),
-        collected_fields=list(collected.keys()),
-        history_len=len(messages_lc),
-    )
-
-    try:
-        resp = await llm.ainvoke(messages_lc)
-        reply_content = resp.content
-        state["turn_count"] = int(state.get("turn_count", 0)) + 1
-    except Exception as exc:
-        logger.error("chat_reply_failed", error=str(exc), session_id=state.get("session_id"))
-        state["error"] = "llm_failure"
-        reply_content = "Sorry, I had a hiccup. Could you repeat that?"
-
-    existing = list(state.get("messages", []))
-    existing.append({"role": "assistant", "content": reply_content, "ts": _utcnow()})
-    state["messages"] = existing
-    state["duration_ms"] = _elapsed(start)
-    return state
+node_chat_reply = build_chat_reply_node(HVAC_EXPERT_SYSTEM, _COLLECTED_FIELDS)
 
 
 # ── 5. Score ──────────────────────────────────────────────────────────────────

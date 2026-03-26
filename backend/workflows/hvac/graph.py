@@ -1,8 +1,7 @@
 # workflows/hvac/graph.py
 from __future__ import annotations
 
-from langgraph.graph import StateGraph, END
-
+from workflows.shared import build_chat_graph, build_post_chat_graph
 from workflows.hvac.nodes import (
     node_check_completion,
     node_chat_reply,
@@ -13,50 +12,16 @@ from workflows.hvac.nodes import (
 )
 from workflows.hvac.state import HvacState
 
-
-def _route_completion(state: dict) -> str:
-    return "complete" if state.get("is_complete") else "continue"
-
-
-def _route_post_score(state: dict) -> str:
-    if state.get("is_spam") or state.get("next_step") == "drop":
-        return "skip"
-    return "go"
-
-
 def build_hvac_chat_graph():
-    # FIX: StateGraph(dict) was the root cause of session_id=None and
-    # history_len=1. When you pass bare `dict`, LangGraph has no schema
-    # and initialises a blank state on every invocation instead of
-    # forwarding the input state to nodes.
-    # Using HvacState (a TypedDict) gives LangGraph the schema it needs
-    # while still treating state as a plain dict at runtime.
-    g = StateGraph(HvacState)
-
-    g.add_node("validate",   node_validate_input)
-    g.add_node("enrich",     node_enrich_lead)
-    g.add_node("check_done", node_check_completion)
-    g.add_node("reply",      node_chat_reply)
-
-    g.set_entry_point("validate")
-    g.add_edge("validate",   "enrich")
-    g.add_edge("enrich",     "check_done")
-    g.add_conditional_edges("check_done", _route_completion,
-                            {"complete": END, "continue": "reply"})
-    g.add_edge("reply", END)
-
-    return g.compile()
-
+    return build_chat_graph(HvacState, {
+        "validate": node_validate_input,
+        "enrich": node_enrich_lead,
+        "check_done": node_check_completion,
+        "reply": node_chat_reply,
+    }, always_reply=False)()
 
 def build_hvac_post_chat_graph():
-    g = StateGraph(HvacState)
-
-    g.add_node("score_lead", node_score_lead)
-    g.add_node("deliver",    node_finalize_and_deliver)
-
-    g.set_entry_point("score_lead")
-    g.add_conditional_edges("score_lead", _route_post_score,
-                            {"go": "deliver", "skip": END})
-    g.add_edge("deliver", END)
-
-    return g.compile()
+    return build_post_chat_graph(HvacState, {
+        "score_lead": node_score_lead,
+        "deliver": node_finalize_and_deliver,
+    })()

@@ -10,10 +10,12 @@ from langchain_core.messages import SystemMessage
 from core.database import Lead, get_db_context
 from llm import llm
 from tools.ai_tools import ai_tools
+from workflows.shared import build_validate_input_node, build_check_completion_node, build_chat_reply_node
 from workflows.base import build_lc_messages, field_missing, get_appt_slots
 from workflows.hvac.schema import LeadEnrichment, LeadScore
 from workflows.plumbing.prompts import PLUMBING_EXPERT_SYSTEM
 from workflows.plumbing.state import PlumbingState
+from langchain_core.messages import HumanMessage, SystemMessage
 
 logger = structlog.get_logger(__name__)
 
@@ -158,80 +160,12 @@ async def node_enrich_lead(state: PlumbingState) -> PlumbingState:
 
 # ── 3. Check completion ───────────────────────────────────────────────────────
 
-async def node_check_completion(state: PlumbingState) -> PlumbingState:
-    if state.get("is_complete"):
-        return state
-    if all(not field_missing(state, f) for f in _REQUIRED_FIELDS):
-        state["is_complete"] = True
-    return state
+node_check_completion = build_check_completion_node(_REQUIRED_FIELDS)
 
 
 # ── 4. Chat reply ─────────────────────────────────────────────────────────────
 
-async def node_chat_reply(state: PlumbingState) -> PlumbingState:
-    start = time.perf_counter()
-    state["last_node"] = "chat_reply"
-
-    # Completion turn — deterministic farewell based on urgency
-    if state.get("is_complete"):
-        address = state.get("address") or "your location"
-        phone   = state.get("phone")   or "the number you provided"
-        issue   = state.get("issue")   or "your plumbing issue"
-
-        if _is_emergency(state):
-            reply_content = (
-                f"Dispatching an emergency plumber to {address} now. "
-                f"Our tech will call {phone} within 15 minutes. "
-                "Keep the main shutoff closed until they arrive."
-            )
-        else:
-            reply_content = (
-                f"Perfect — scheduling a plumber to {address} for {issue}. "
-                f"Our tech will call {phone} to confirm the time. You're all set!"
-            )
-
-        state["turn_count"] = int(state.get("turn_count", 0)) + 1
-        existing = list(state.get("messages", []))
-        existing.append({"role": "assistant", "content": reply_content, "ts": _utcnow()})
-        state["messages"] = existing
-        state["duration_ms"] = _elapsed(start)
-        return state
-
-    # Normal turn — LLM asks next question
-    slots = state.get("appt_slots") or get_appt_slots()
-    state["appt_slots"] = slots
-
-    collected = {f: state.get(f) for f in _COLLECTED_FIELDS if state.get(f) is not None}
-    expert_prompt = PLUMBING_EXPERT_SYSTEM.format(
-        collected=str(collected),
-        slot_1=slots[0],
-        slot_2=slots[1],
-        slot_3=slots[2],
-    )
-    messages_lc = [SystemMessage(content=expert_prompt)] + build_lc_messages(state)
-
-    logger.debug("plumbing_chat_reply_invoke",
-        session_id=state.get("session_id"),
-        turn=state.get("turn_count", 0),
-        collected_fields=list(collected.keys()),
-        is_emergency=_is_emergency(state),
-    )
-
-    try:
-        resp = await llm.ainvoke(messages_lc)
-        reply_content = resp.content
-        state["turn_count"] = int(state.get("turn_count", 0)) + 1
-    except Exception as exc:
-        logger.error("plumbing_chat_reply_failed", error=str(exc),
-                     session_id=state.get("session_id"))
-        state["error"] = "llm_failure"
-        reply_content = "Sorry, I had a hiccup. Could you repeat that?"
-
-    existing = list(state.get("messages", []))
-    existing.append({"role": "assistant", "content": reply_content, "ts": _utcnow()})
-    state["messages"] = existing
-    state["duration_ms"] = _elapsed(start)
-    return state
+node_chat_reply = build_chat_reply_node(PLUMBING_EXPERT_SYSTEM, _COLLECTED_FIELDS)
 
 
 # ── 5. Score ──────────────────────────────────────────────────────────────────

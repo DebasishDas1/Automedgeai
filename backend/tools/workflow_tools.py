@@ -12,10 +12,46 @@ from workflows.registry import registry
 logger = structlog.get_logger(__name__)
 
 
-async def _save_session(db: AsyncSession, row: ChatSession, state: dict) -> None:
-    state["messages"] = state.get("messages", [])[-20:]
+async def _save_session(db: AsyncSession, row: ChatSession, state) -> None:
+    """
+    Normalize and persist LangGraph state safely across versions.
+
+    Handles:
+    - raw string outputs (wrap into assistant message)
+    - returned LangGraph State objects (with .state)
+    - dict state (normal case)
+    - any other object (stringify)
+    """
+
+    # ----- Normalize ---------------------------------------------------------
+    if isinstance(state, str):
+        # Wrap simple LLM output into assistant message format
+        state = {
+            "messages": [{"role": "assistant", "content": state}],
+            "is_complete": False,
+        }
+
+    elif hasattr(state, "state"):
+        # LangGraph State object
+        state = dict(state.state)
+
+    elif not isinstance(state, dict):
+        # Fallback: unexpected type
+        state = {
+            "messages": [{"role": "assistant", "content": str(state)}],
+            "is_complete": False,
+        }
+
+    # ----- Safety: messages list always exists -------------------------------
+    msgs = state.get("messages", [])
+    if not isinstance(msgs, list):
+        msgs = [msgs]
+    state["messages"] = msgs[-20:]  # keep last 20 messages only
+
+    # ----- Persist -----------------------------------------------------------
     row.state = {k: v for k, v in state.items() if not k.startswith("_")}
     flag_modified(row, "state")
+
     row.is_complete = bool(state.get("is_complete"))
     row.updated_at = datetime.now(timezone.utc)
 

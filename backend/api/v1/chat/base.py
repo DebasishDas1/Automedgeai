@@ -183,7 +183,13 @@ async def handle_message_stream(body: MessageRequest, db) -> StreamingResponse:
         if final_output is not None:
             try:
                 async with get_db_context() as fresh_db:
-                    await workflow_tools._save_session(fresh_db, body.session_id, final_output)
+                    res2 = await fresh_db.execute(
+                        select(ChatSession).where(ChatSession.session_id == body.session_id)
+                    )
+                    row2 = res2.scalar_one_or_none()
+                    if row2:
+                        await workflow_tools._save_session(fresh_db, row2, final_output)
+                        await fresh_db.commit()
             except Exception as exc:
                 logger.error(
                     "stream_save_failed",

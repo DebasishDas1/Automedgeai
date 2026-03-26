@@ -10,6 +10,7 @@ from langchain_core.messages import SystemMessage
 from core.database import Lead, get_db_context
 from llm import llm
 from tools.ai_tools import ai_tools
+from workflows.shared import build_validate_input_node, build_check_completion_node, build_chat_reply_node
 from workflows.base import build_lc_messages, field_missing, get_appt_slots
 from workflows.hvac.schema import LeadEnrichment, LeadScore
 from workflows.roofing.prompts import ROOFING_EXPERT_SYSTEM
@@ -164,91 +165,12 @@ async def node_enrich_lead(state: RoofingState) -> RoofingState:
 
 # ── 3. Check completion ───────────────────────────────────────────────────────
 
-async def node_check_completion(state: RoofingState) -> RoofingState:
-    if state.get("is_complete"):
-        return state
-    if all(not field_missing(state, f) for f in _REQUIRED_FIELDS):
-        state["is_complete"] = True
-    return state
+node_check_completion = build_check_completion_node(_REQUIRED_FIELDS)
 
 
 # ── 4. Chat reply ─────────────────────────────────────────────────────────────
 
-async def node_chat_reply(state: RoofingState) -> RoofingState:
-    start = time.perf_counter()
-    state["last_node"] = "chat_reply"
-
-    # Completion turn — farewell varies by lead type
-    if state.get("is_complete"):
-        address  = state.get("address") or "your property"
-        phone    = state.get("phone")   or "the number you provided"
-        is_storm = _is_storm_lead(state)
-        is_hv    = _is_high_value(state)
-
-        if is_hv:
-            # Storm + insurance — highest value path
-            reply_content = (
-                f"Perfect — scheduling a free inspection at {address}. "
-                f"Our inspector will document everything with photos for your insurance claim. "
-                f"They'll call {phone} 30 minutes before arrival. You're all set!"
-            )
-        elif is_storm:
-            # Storm but no insurance confirmed yet
-            reply_content = (
-                f"Scheduling a free inspection at {address} for storm damage assessment. "
-                f"Our inspector will call {phone} 30 minutes before arrival with a photo report. "
-                "If you have homeowners insurance, have your policy number handy."
-            )
-        else:
-            # Wear / routine
-            reply_content = (
-                f"Scheduling a free inspection at {address}. "
-                f"Our inspector will assess the damage and walk you through options. "
-                f"They'll call {phone} 30 minutes before arrival. You're all set!"
-            )
-
-        state["turn_count"] = int(state.get("turn_count", 0)) + 1
-        existing = list(state.get("messages", []))
-        existing.append({"role": "assistant", "content": reply_content, "ts": _utcnow()})
-        state["messages"] = existing
-        state["duration_ms"] = _elapsed(start)
-        return state
-
-    # Normal turn — LLM asks next diagnostic question
-    slots = state.get("appt_slots") or get_appt_slots()
-    state["appt_slots"] = slots
-
-    collected = {f: state.get(f) for f in _COLLECTED_FIELDS if state.get(f) is not None}
-    expert_prompt = ROOFING_EXPERT_SYSTEM.format(
-        collected=str(collected),
-        slot_1=slots[0],
-        slot_2=slots[1],
-        slot_3=slots[2],
-    )
-    messages_lc = [SystemMessage(content=expert_prompt)] + build_lc_messages(state)
-
-    logger.debug("roofing_chat_reply_invoke",
-        session_id=state.get("session_id"),
-        turn=state.get("turn_count", 0),
-        collected_fields=list(collected.keys()),
-        is_storm=_is_storm_lead(state),
-    )
-
-    try:
-        resp = await llm.ainvoke(messages_lc)
-        reply_content = resp.content
-        state["turn_count"] = int(state.get("turn_count", 0)) + 1
-    except Exception as exc:
-        logger.error("roofing_chat_reply_failed", error=str(exc),
-                     session_id=state.get("session_id"))
-        state["error"] = "llm_failure"
-        reply_content = "Sorry, I had a hiccup. Could you repeat that?"
-
-    existing = list(state.get("messages", []))
-    existing.append({"role": "assistant", "content": reply_content, "ts": _utcnow()})
-    state["messages"] = existing
-    state["duration_ms"] = _elapsed(start)
-    return state
+node_chat_reply = build_chat_reply_node(ROOFING_EXPERT_SYSTEM, _COLLECTED_FIELDS)
 
 
 # ── 5. Score ──────────────────────────────────────────────────────────────────
