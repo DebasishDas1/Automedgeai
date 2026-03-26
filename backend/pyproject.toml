@@ -6,32 +6,36 @@ readme = "README.md"
 requires-python = ">=3.12"
 
 dependencies = [
-    "asyncpg>=0.31.0",
-    "orjson>=3.10.0",
+    # Core framework
     "fastapi>=0.115.0",
-    "httpx>=0.28.1",
-    # LLM stack (dual mode)
-    "langchain-groq>=1.1.2",
-    "langchain-ollama>=1.0.1",
-    "langgraph>=1.0.10",
-    "groq>=0.9.0",
-    # Core config
+    "uvicorn[standard]>=0.30.0",
+
+    # Database & async
+    "sqlalchemy[asyncio]>=2.0.48",
+    "asyncpg>=0.31.0",
+
+    # Configuration & validation
     "pydantic>=2.12.5",
     "pydantic-settings>=2.13.1",
-    "python-dotenv>=1.2.2",
+
+    # Performance JSON
+    "orjson>=3.10.0",
+
+    # Network client
+    "httpx>=0.28.1",
+
     # Logging & retries
     "structlog>=24.4.0",
     "tenacity>=9.0.0",
-    # Database
-    "sqlalchemy[asyncio]>=2.0.48",
-    # Optional integrations (remove if unused)
-    "firebase-admin>=7.2.0",
-    "gspread>=6.2.1",
-    "resend>=2.23.0",
-    "twilio>=9.10.2",
-    # Server
-    "uvicorn[standard]>=0.30.0",
-    "google-api-python-client>=2.193.0",
-    "google-auth>=2.49.0",
-    "hubspot-api-client>=12.0.0",
+
+    # LLM + workflow
+    "groq>=0.9.0",
+    "langchain-groq>=1.1.2",
+    "langchain-ollama>=1.0.1",
+    "langgraph>=1.0.10",
+
+    # Light external integrations
+    "resend>=2.23.0",           # Email
+    "twilio>=9.10.2",           # SMS / WhatsApp
+    "hubspot-api-client>=12.0.0"  # CRM
 ]
