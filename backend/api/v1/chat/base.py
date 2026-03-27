@@ -162,7 +162,7 @@ async def handle_message_stream(body: MessageRequest, db) -> StreamingResponse:
             async for event in graph.astream_events(current_state, version="v2"):
                 evt = event["event"]
 
-                if evt == "on_chat_model_stream":
+                if evt == "on_chat_model_stream" and event.get("metadata", {}).get("langgraph_node") == "reply":
                     chunk = event["data"]["chunk"].content
                     if chunk:
                         yield f"data: {json.dumps({'chunk': chunk})}\n\n"

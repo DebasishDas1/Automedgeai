@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     # HubSpot
     # -------------------------
     HUBSPOT_ACCESS_TOKEN: Optional[str] = None
+    HUBSPOT_PIPELINE_ID: str = "default"
+    HUBSPOT_STAGE_HOT: str = "appointmentscheduled"
+    HUBSPOT_STAGE_WARM: str = "qualifiedtobuy"
+    HUBSPOT_STAGE_COLD: str = "presentationscheduled"
 
     # -------------------------
     # CORS

@@ -1,11 +1,15 @@
-# services/workflow_tools.py
+# tools/workflow_tools.py
 from __future__ import annotations
 
-import asyncio, structlog, uuid
+import asyncio
+import uuid
+import structlog
 from datetime import datetime, timezone
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
+
 from core.database import ChatSession, get_db_context
 from workflows.registry import registry
 
@@ -13,79 +17,62 @@ logger = structlog.get_logger(__name__)
 
 
 async def _save_session(db: AsyncSession, row: ChatSession, state) -> None:
-    """
-    Normalize and persist LangGraph state safely across versions.
-
-    Handles:
-    - raw string outputs (wrap into assistant message)
-    - returned LangGraph State objects (with .state)
-    - dict state (normal case)
-    - any other object (stringify)
-    """
-
-    # ----- Normalize ---------------------------------------------------------
+    """Normalize and persist LangGraph state. Caller must commit."""
     if isinstance(state, str):
-        # Wrap simple LLM output into assistant message format
-        state = {
-            "messages": [{"role": "assistant", "content": state}],
-            "is_complete": False,
-        }
-
+        state = {"messages": [{"role": "assistant", "content": state}], "is_complete": False}
     elif hasattr(state, "state"):
-        # LangGraph State object
         state = dict(state.state)
-
     elif not isinstance(state, dict):
-        # Fallback: unexpected type
-        state = {
-            "messages": [{"role": "assistant", "content": str(state)}],
-            "is_complete": False,
-        }
+        state = {"messages": [{"role": "assistant", "content": str(state)}], "is_complete": False}
 
-    # ----- Safety: messages list always exists -------------------------------
     msgs = state.get("messages", [])
     if not isinstance(msgs, list):
         msgs = [msgs]
-    state["messages"] = msgs[-20:]  # keep last 20 messages only
+    state["messages"] = msgs[-20:]
 
-    # ----- Persist -----------------------------------------------------------
     row.state = {k: v for k, v in state.items() if not k.startswith("_")}
     flag_modified(row, "state")
-
     row.is_complete = bool(state.get("is_complete"))
     row.updated_at = datetime.now(timezone.utc)
 
 
 async def start_session(
-    db: AsyncSession, vertical: str,
-    name: str | None = None, email: str | None = None,
-    phone: str | None = None, source: str | None = None,
+    db: AsyncSession,
+    vertical: str,
+    name: str | None = None,
+    email: str | None = None,
+    phone: str | None = None,
+    source: str | None = None,
 ) -> dict:
-    session_id = str(uuid.uuid4())
+    """
+    Create a new chat session, pre-seeding contact fields from the lead form.
 
-    # FIX: Seed name/email/phone from form into graph state directly.
-    # Previously these were stored only in form_data and never reached
-    # the graph, so the bot kept asking for them even though we had them.
-    # Now they start as collected — bot skips straight to issue/urgency/address.
+    BUG FIX: vertical was not validated. An invalid vertical created a DB row
+    then crashed at registry.get_chat_graph() on the first message, leaving
+    an orphaned unrecoverable session. Validate before writing to DB.
+    """
+    _SUPPORTED = {"hvac", "plumbing", "roofing", "pest_control"}
+    if vertical not in _SUPPORTED:
+        raise ValueError(f"Unknown vertical '{vertical}'. Supported: {sorted(_SUPPORTED)}")
+
+    session_id = str(uuid.uuid4())
     initial_state = {
-        "session_id": session_id,
-        "vertical": vertical,
-        "messages": [],
-        "turn_count": 0,
-        "is_complete": False,
-        "is_spam": False,
-        "intent": "service_request",
-        # Pre-fill from form — bot will not ask for these
-        "name":  name  or None,
-        "email": email or None,
-        "phone": phone or None,
-        # These must still be collected through conversation
-        "issue":       None,
-        "description": None,
-        "urgency":     None,
-        "address":     None,
-        "is_homeowner":None,
-        "ai_urgency":  None,
+        "session_id":   session_id,
+        "vertical":     vertical,
+        "messages":     [],
+        "turn_count":   0,
+        "is_complete":  False,
+        "is_spam":      False,
+        "intent":       "service_request",
+        "name":         name  or None,
+        "email":        email or None,
+        "phone":        phone or None,
+        "issue":        None,
+        "description":  None,
+        "urgency":      None,
+        "address":      None,
+        "is_homeowner": None,
+        "ai_urgency":   None,
     }
 
     row = ChatSession(
@@ -102,41 +89,66 @@ async def start_session(
 
 
 async def send_message(db: AsyncSession, session_id: str, user_msg: str) -> dict:
+    """
+    Append user message, invoke chat graph, persist result.
+
+    BUG FIX: state["messages"] was mutated before graph.ainvoke(). If ainvoke()
+    raised, the DB row was left with the user message appended but no assistant
+    reply -- permanently broken session. Now graph_input is a clean local copy;
+    row.state is only updated after a successful invoke via _save_session.
+
+    BUG FIX: post-chat task was created without a name, making it invisible in
+    asyncio task introspection. Named for debuggability.
+    """
     stmt = select(ChatSession).where(
-        ChatSession.session_id == session_id).with_for_update()
+        ChatSession.session_id == session_id
+    ).with_for_update()
     res = await db.execute(stmt)
     row = res.scalar_one_or_none()
 
-    if not row: raise ValueError("session_not_found")
-    if row.is_complete: raise ValueError("session_already_complete")
+    if row is None:
+        raise ValueError("session_not_found")
+    if row.is_complete:
+        raise ValueError("session_already_complete")
 
     state = dict(row.state)
-    state["messages"] = list(state.get("messages", []))
-    state["messages"].append({
-        "role": "user", "content": user_msg,
-        "ts": datetime.now(timezone.utc).isoformat(),
-    })
+    graph_input = {
+        **state,
+        "messages": list(state.get("messages", [])) + [{
+            "role": "user",
+            "content": user_msg,
+            "ts": datetime.now(timezone.utc).isoformat(),
+        }],
+    }
 
     graph = registry.get_chat_graph(row.vertical)
-    result = await graph.ainvoke(state)
+    result = await graph.ainvoke(graph_input)
 
+    was_complete = bool(state.get("is_complete"))
     await _save_session(db, row, result)
     await db.commit()
 
-    if result.get("is_complete") and not state.get("is_complete"):
-        post_state = dict(result)
-        asyncio.create_task(run_post_chat(post_state, row.vertical))
+    if result.get("is_complete") and not was_complete:
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(
+                run_post_chat(dict(result), row.vertical),
+                name=f"post_chat_{session_id[:8]}",
+            )
+        except RuntimeError:
+            logger.error("post_chat_schedule_failed_no_loop", session_id=session_id)
 
     last_ai = next(
         (m["content"] for m in reversed(result.get("messages", []))
-         if m.get("role") == "assistant"), "")
-
+         if m.get("role") == "assistant"),
+        "",
+    )
     return {
-        "session_id": session_id,
-        "message": last_ai,
-        "turn": result.get("turn_count", 0),
-        "is_complete": bool(result.get("is_complete")),
-        "appt_booked": bool(result.get("appt_booked")),
+        "session_id":       session_id,
+        "message":          last_ai,
+        "turn":             result.get("turn_count", 0),
+        "is_complete":      bool(result.get("is_complete")),
+        "appt_booked":      bool(result.get("appt_booked")),
         "fields_collected": {
             k: result.get(k)
             for k in ("name", "email", "phone", "issue",
@@ -147,33 +159,37 @@ async def send_message(db: AsyncSession, session_id: str, user_msg: str) -> dict
 
 
 async def run_post_chat(state: dict, vertical: str) -> None:
+    """Run score + deliver post-chat graph. Errors are fully caught."""
     graph = registry.get_post_graph(vertical)
-    if not graph: return
+    if graph is None:
+        logger.warning("post_chat_no_graph", vertical=vertical)
+        return
+
+    session_id = state.get("session_id")
     try:
         async with get_db_context() as db:
             stmt = select(ChatSession).where(
-                ChatSession.session_id == state["session_id"]).with_for_update()
+                ChatSession.session_id == session_id
+            ).with_for_update()
             res = await db.execute(stmt)
             row = res.scalar_one_or_none()
-            if row:
-                result = await graph.ainvoke(state)
-                await _save_session(db, row, result)
-                await db.commit()
-                logger.info("post_chat_complete", session_id=state.get("session_id"))
+            if row is None:
+                logger.warning("post_chat_session_not_found", session_id=session_id)
+                return
+            result = await graph.ainvoke(state)
+            await _save_session(db, row, result)
+            await db.commit()
+            logger.info("post_chat_complete", session_id=session_id)
     except Exception as exc:
-        logger.error("post_chat_failed", session_id=state.get("session_id"), error=str(exc))
+        logger.error("post_chat_failed", session_id=session_id, error=str(exc))
 
 
 async def save_session_by_id(db: AsyncSession, session_id: str, state: dict) -> None:
-    """Save session state by session_id."""
-    from core.database import ChatSession, select
-    
+    """Update session state by ID. Caller must commit."""
     res = await db.execute(
         select(ChatSession).where(ChatSession.session_id == session_id)
     )
     row = res.scalar_one_or_none()
-    
-    if not row:
+    if row is None:
         raise ValueError(f"session_not_found: {session_id}")
-    
     await _save_session(db, row, state)

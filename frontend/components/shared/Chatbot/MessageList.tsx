@@ -15,25 +15,42 @@ interface MessageListProps {
 const MessageBubble = memo(({ msg, isLast, isTyping }: any) => {
   const isUser = msg.sender === "user";
 
-  const shouldAnimate = !isUser && isLast && isTyping;
+  const entrance = isUser
+    ? { opacity: 1, y: 0 }
+    : { opacity: 1, y: [10, 0], scale: [0.96, 1] };
+
+  const typingFeel =
+    !isUser && isLast && isTyping
+      ? {
+          opacity: [0.45, 1, 0.45],
+          scale: [1, 1.015, 1], // small thoughtful swell
+          y: [0, -2, 0], // tiny “breathing” lift
+        }
+      : {};
 
   return (
     <motion.div
-      key={msg.id + (shouldAnimate ? "-typing" : "")} // 🔥 force re-trigger
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
+      key={msg.id}
+      initial={{ opacity: 0, y: 8 }}
+      animate={entrance}
+      transition={{ duration: 0.35 }}
       className={cn("flex", isUser ? "justify-end" : "justify-start")}
     >
       <motion.div
         className={cn(
-          "max-w-[75%] px-4 py-3 rounded-lg text-[14px] leading-relaxed text-black dark:text-white",
-          isUser ? "bg-accent/60" : "",
+          "max-w-[75%] px-4 py-3 rounded-lg text-[14px] leading-relaxed",
+          isUser
+            ? "bg-accent/60 text-black dark:text-white"
+            : "bg-transparent text-black dark:text-white",
         )}
-        animate={shouldAnimate ? { opacity: [0.5, 1, 0.5] } : { opacity: 1 }}
+        animate={typingFeel}
         transition={
-          shouldAnimate
-            ? { duration: 1, repeat: Infinity, ease: "easeInOut" }
+          typingFeel.opacity
+            ? {
+                duration: 2.4, // 🌙 much slower typing cadence
+                repeat: Infinity,
+                ease: "easeInOut",
+              }
             : {}
         }
       >
@@ -48,17 +65,21 @@ const QuickReplies = memo(({ replies, onQuickReply }: any) => {
   if (!replies?.length) return null;
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex flex-wrap gap-2"
+    >
       {replies.map((r: any) => (
         <Button
           key={r.id}
           onClick={() => onQuickReply(r.text)}
-          className="hover:dark:bg-accent hover:dark:text-black bg-accent/20 text-black dark:text-white"
+          className="hover:dark:bg-accent bg-accent/20 dark:text-white text-black"
         >
           {r.text}
         </Button>
       ))}
-    </div>
+    </motion.div>
   );
 });
 

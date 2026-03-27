@@ -118,20 +118,31 @@ export function Chatbot({ vertical = "general" }: ChatbotProps) {
   const isTypingRef = useRef(false);
   const isCompleteRef = useRef(false);
 
+  const handleBotComplete = useCallback(() => {
+    setIsComplete(true);
+    isCompleteRef.current = true;
+
+    toast.success("Your inquiry has been successfully received by our team.", {
+      description: "We've received your message and will follow up shortly.",
+      duration: 6000,
+      icon: <ShieldCheck className="w-5 h-5 text-emerald-500" />,
+      className:
+        "bg-white dark:bg-slate-900 border-2 border-emerald-500/20 rounded-2xl shadow-xl",
+    });
+  }, []);
+
   const handleSend = useCallback(
     async (textOverride?: string) => {
       const msg = (textOverride ?? "").trim();
-
       if (!msg) return;
+
       if (isCompleteRef.current || isTypingRef.current) return;
 
-      // 🧠 optimistic UI
+      // optimistic push
       setMessages((prev) => [
         ...prev,
         { id: uid(), text: msg, sender: "user" },
       ]);
-      
-      // Clear input state
       setInput("");
 
       setIsTyping(true);
@@ -139,67 +150,48 @@ export function Chatbot({ vertical = "general" }: ChatbotProps) {
 
       try {
         const currentSessionId = sessionIdRef.current;
-
         if (!currentSessionId) {
-          addBotMsg("Session still warming up… give it a second.");
+          addBotMsg("Session is starting up… try again shortly.");
           return;
         }
 
-        setIsTyping(false); // remove initial typing dots to start streamed text
         const botMsgId = uid();
-        setMessages((prev) => [
-          ...prev,
-          { id: botMsgId, text: "", sender: "bot" }
-        ]);
-
-        let isDone = false;
-        let errorMessage = "Something slipped through the wires. Try again?";
+        let hasAddedInitialBotChunk = false;
 
         await streamChatMessage(
           apiVertical,
           currentSessionId,
           msg,
           (chunk) => {
-            setMessages((prev) => 
-              prev.map(m => m.id === botMsgId ? { ...m, text: m.text + chunk } : m)
-            );
+            if (!hasAddedInitialBotChunk) {
+              hasAddedInitialBotChunk = true;
+              setIsTyping(false);
+
+              setMessages((prev) => [
+                ...prev,
+                { id: botMsgId, text: chunk, sender: "bot" },
+              ]);
+            } else {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === botMsgId ? { ...m, text: m.text + chunk } : m,
+                ),
+              );
+            }
           },
           (meta) => {
-            if (meta.is_complete) {
-              isDone = true;
+            if (meta?.is_complete) {
+              handleBotComplete();
             }
-          }
-        ).catch((err) => {
-          errorMessage = err instanceof Error ? err.message : errorMessage;
-          throw err; // rethrow for catch block
-        });
-
-        if (isDone) {
-          setIsComplete(true);
-          isCompleteRef.current = true;
-
-          // Transition to direct alert/success state
-          setIsOpen(false);
-          
-          toast.success("Request Processed!", {
-            description: "Your inquiry has been successfully received by our team.",
-            duration: 6000,
-            icon: <ShieldCheck className="w-5 h-5 text-emerald-500" />,
-            className: "bg-white dark:bg-slate-900 border-2 border-emerald-500/20 rounded-2xl shadow-xl",
-          });
-
-          resetChat();
-          return;
-        }
+          },
+        );
       } catch (err: any) {
-        // 🌐 smarter error UX
-        if (err?.status === 408) {
-          addBotMsg("Server is waking up… try again in a moment.");
-        } else if (err?.status === 404) {
-          addBotMsg("Session expired. Refresh and start again.");
-        } else {
-          addBotMsg("Network hiccup. Check connection and retry.");
-        }
+        const status = err?.status;
+
+        if (status === 408) addBotMsg("Server is warming up… try again soon.");
+        else if (status === 404)
+          addBotMsg("Session expired. Refresh and restart.");
+        else addBotMsg("Something went sideways… check your network.");
 
         console.error("send error:", err);
       } finally {
@@ -207,7 +199,7 @@ export function Chatbot({ vertical = "general" }: ChatbotProps) {
         isTypingRef.current = false;
       }
     },
-    [apiVertical, addBotMsg, resetChat],
+    [apiVertical, addBotMsg, handleBotComplete],
   );
 
   return (

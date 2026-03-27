@@ -8,6 +8,7 @@ from typing import Callable, Any
 import structlog
 from langchain_core.messages import SystemMessage, HumanMessage
 from langgraph.graph import StateGraph, END
+import re
 
 from llm import llm
 from workflows.base import field_missing
@@ -94,9 +95,10 @@ def build_chat_reply_node(system_prompt_template: str, fields_to_collect: tuple[
         ])
 
         assistant_text = reply.content.strip()
-        if assistant_text.startswith("```"):
-            assistant_text = assistant_text.split("```")[-1].strip()
-
+        # Strip any leading/trailing code fences the model might emit
+        assistant_text = re.sub(r"^```[a-z]*\n?", "", assistant_text).strip()
+        assistant_text = re.sub(r"```$", "", assistant_text).strip()
+        
         new_messages = list(state.get("messages", []))
         new_messages.append({"role": "assistant", "content": assistant_text})
 

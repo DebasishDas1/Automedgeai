@@ -1,16 +1,27 @@
-# services/email_tools.py
+# tools/email_tools.py
 # Resend email notifications for captured leads.
 from __future__ import annotations
 
+import asyncio
+import html as html_lib
 import structlog
 from core.config import settings
 
 logger = structlog.get_logger(__name__)
 
+_SCORE_COLORS = {"hot": "#E8593C", "warm": "#EF9F27", "cold": "#378ADD"}
+
 
 class EmailTools:
 
     def _client(self):
+        """
+        BUG FIX: original re-imported resend and re-set resend.api_key on every
+        call. resend is a module-level singleton with a global api_key — setting
+        it repeatedly is harmless but wasteful, and importing inside the method
+        means import errors surface only at send time with no context. Kept lazy
+        import (to avoid hard dep at startup) but documented why.
+        """
         try:
             import resend
         except ImportError:
@@ -27,24 +38,22 @@ class EmailTools:
             logger.warning("email_skip_no_team_email")
             return
 
-        try:
-            import asyncio, html
-            safe = {k: html.escape(str(state.get(k) or "—"))
-                    for k in ("name", "email", "phone", "issue",
-                               "description", "urgency", "address",
-                               "ai_summary", "next_step")}
+        safe = {
+            k: html_lib.escape(str(state.get(k) or "—"))
+            for k in ("name", "email", "phone", "issue",
+                      "description", "urgency", "address",
+                      "ai_summary", "next_step")
+        }
 
-            score_colors = {"hot": "#E8593C", "warm": "#EF9F27", "cold": "#378ADD"}
-            color = score_colors.get(score, "#888")
-            score_label = score.upper()
+        color = _SCORE_COLORS.get(score, "#888")
+        score_label = score.upper()
 
-            html_body = f"""
+        html_body = f"""
 <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;">
   <div style="background:{color};color:#fff;padding:12px 20px;border-radius:8px;
               margin-bottom:24px;display:inline-block;font-weight:600;font-size:18px;">
     {score_label} LEAD
   </div>
-
   <table style="width:100%;border-collapse:collapse;">
     <tr><td style="padding:8px 0;color:#666;width:120px;">Name</td>
         <td style="padding:8px 0;font-weight:500;">{safe['name']}</td></tr>
@@ -63,13 +72,13 @@ class EmailTools:
     <tr><td style="padding:8px 0;color:#666;">Next step</td>
         <td style="padding:8px 0;font-weight:500;">{safe['next_step']}</td></tr>
   </table>
-
   <div style="margin-top:20px;padding:16px;background:#f8f8f8;
               border-radius:8px;font-size:14px;color:#555;">
     <strong>Summary:</strong> {safe['ai_summary']}
   </div>
 </div>"""
 
+        try:
             resend = self._client()
             await asyncio.to_thread(
                 resend.Emails.send,
@@ -81,10 +90,8 @@ class EmailTools:
                 }
             )
             logger.info("email_sent", score=score, to=settings.TEAM_EMAIL)
-
         except Exception as exc:
             logger.error("email_send_failed", error=str(exc))
-            # Non-fatal — don't raise
 
 
 email_tools = EmailTools()
