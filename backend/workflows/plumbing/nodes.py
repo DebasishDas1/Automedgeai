@@ -1,22 +1,18 @@
 # workflows/plumbing/nodes.py
 from __future__ import annotations
 
+import asyncio
 import time
 from datetime import datetime, timezone
 
 import structlog
-import asyncio
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from core.database import Lead, get_db_context
 from llm import llm
 from tools.ai_tools import ai_tools
-from workflows.shared import (
-    build_validate_input_node,
-    build_check_completion_node,
-    build_chat_reply_node,
-)
-from workflows.base import build_lc_messages, field_missing, get_appt_slots
+from workflows.shared import build_check_completion_node, build_chat_reply_node
+from workflows.base import field_missing, get_appt_slots
 from workflows.hvac.schema import LeadEnrichment, LeadScore
 from workflows.plumbing.prompts import PLUMBING_EXPERT_SYSTEM
 from workflows.plumbing.state import PlumbingState
@@ -29,10 +25,11 @@ _COLLECTED_FIELDS = (
     "issue", "issue_type", "problem_area", "has_water_damage",
     "is_getting_worse", "main_shutoff_off", "is_homeowner",
     "property_type", "address", "urgency", "name", "phone", "email",
+    "wants_appointment", "appt_confirmed",
 )
 
-# issue + address covers both emergency (dispatch) and routine (schedule).
-# name/phone/email come pre-seeded from the lead form.
+# issue + address covers both emergency dispatch and routine scheduling.
+# name/phone/email pre-seeded from lead form.
 _REQUIRED_FIELDS = ("issue", "address")
 
 _EMERGENCY_KEYWORDS = {
@@ -51,7 +48,6 @@ def _safe_merge(state: PlumbingState, field: str, new_val) -> None:
 
 
 def _is_emergency(state: PlumbingState) -> bool:
-    """Fast-path emergency detection — no LLM tokens."""
     issue = (state.get("issue") or "").lower()
     issue_type = state.get("issue_type", "")
     urgency = state.get("urgency") or state.get("ai_urgency", "")
@@ -61,6 +57,10 @@ def _is_emergency(state: PlumbingState) -> bool:
         or any(kw in issue for kw in _EMERGENCY_KEYWORDS)
         or bool(state.get("has_water_damage") and state.get("is_getting_worse"))
     )
+
+
+def _normalize_phone(phone: str) -> str:
+    return phone if phone.startswith("+") else f"+{phone}"
 
 
 # ── 1. Validate ───────────────────────────────────────────────────────────────
@@ -93,41 +93,35 @@ async def node_validate_input(state: PlumbingState) -> PlumbingState:
 # ── 2. Enrich ─────────────────────────────────────────────────────────────────
 
 async def node_enrich_lead(state: PlumbingState) -> PlumbingState:
+    """
+    Extract fields from last message + classify full history in parallel.
+    Also detects appointment intent from last user message.
+    """
     start = time.perf_counter()
     state["last_node"] = "enrich_lead"
 
     messages = state.get("messages", [])
     last_user = next(
-        (m["content"] for m in reversed(messages) if m.get("role") == "user"),
-        None
+        (m["content"] for m in reversed(messages) if m.get("role") == "user"), None
     )
 
-    # A + B combined: extraction + classification run in parallel
+    # Run extraction and classification concurrently — no data dependency between them
+    extraction_task = (
+        ai_tools.extract_plumbing_fields(last_user)
+        if last_user else asyncio.coroutine(lambda: None)()
+    )
     extraction, classification = await asyncio.gather(
-        ai_tools.extract_plumbing_fields(last_user) if last_user else None,
+        extraction_task,
         ai_tools.classify_conversation(messages),
         return_exceptions=True,
     )
 
-    # Handle extraction errors
+    # A. Merge extracted fields
     if isinstance(extraction, Exception):
-        logger.warning(
-            "plumbing_extraction_failed",
-            error=str(extraction),
-            session_id=state.get("session_id")
-        )
+        logger.warning("plumbing_extraction_failed", error=str(extraction),
+                       session_id=state.get("session_id"))
         extraction = None
 
-    # Handle classification errors
-    if isinstance(classification, Exception):
-        logger.warning(
-            "classification_failed",
-            error=str(classification),
-            session_id=state.get("session_id")
-        )
-        classification = None
-
-    # A. Merge extracted fields (only last user message)
     if extraction:
         _safe_merge(state, "name",             extraction.get("name"))
         _safe_merge(state, "email",            extraction.get("email"))
@@ -138,44 +132,54 @@ async def node_enrich_lead(state: PlumbingState) -> PlumbingState:
         _safe_merge(state, "property_type",    extraction.get("property_type"))
         _safe_merge(state, "is_homeowner",     extraction.get("is_homeowner"))
         _safe_merge(state, "main_shutoff_off", extraction.get("main_shutoff_off"))
-
-        addr = extraction.get("address") or extraction.get("location")
-        _safe_merge(state, "address", addr)
-
+        _safe_merge(state, "address",
+                    extraction.get("address") or extraction.get("location"))
         for bf in ("has_water_damage", "is_getting_worse"):
             if extraction.get(bf) is not None:
                 _safe_merge(state, bf, extraction[bf])
-
         if extraction.get("urgency") and field_missing(state, "urgency"):
             state["urgency"] = extraction["urgency"]
 
-    # B. Merge classification results
-    if classification:
+    # B. Apply classification
+    if isinstance(classification, Exception):
+        logger.warning("classification_failed", error=str(classification),
+                       session_id=state.get("session_id"))
+        state.setdefault("is_spam", False)
+        state.setdefault("intent", "service_request")
+    elif classification:
         state["intent"]     = classification.get("intent", "service_request")
         state["is_spam"]    = classification.get("is_spam", False)
         state["ai_summary"] = classification.get("summary")
         state["ai_urgency"] = classification.get("urgency", "normal")
-
-        # Only set urgency after at least 2 turns
         if field_missing(state, "urgency") and int(state.get("turn_count", 0)) >= 2:
             state["urgency"] = state["ai_urgency"]
-    else:
-        # Safe defaults if classification fails
-        state.setdefault("is_spam", False)
-        state.setdefault("intent", "service_request")
 
-    # Emergency inference
+    # C. Fast-path emergency detection
     if field_missing(state, "issue_type") and _is_emergency(state):
         state["issue_type"] = "emergency"
 
-    logger.info("plumbing_enriched",
-                session_id=state.get("session_id"),
-                collected={f: state.get(f) for f in _REQUIRED_FIELDS},
-                issue_type=state.get("issue_type"),
-                is_emergency=_is_emergency(state))
+    # D. Appointment intent detection from last user message
+    if last_user and state.get("is_complete") and not state.get("wants_appointment"):
+        msg_lower = last_user.lower()
+        appt_keywords = {
+            "book", "schedule", "appointment", "appt", "slot", "available",
+            "when can", "set up", "come out", "send someone", "visit",
+            "monday", "tuesday", "wednesday", "thursday", "friday",
+            "tomorrow", "next week", "morning", "afternoon",
+        }
+        if any(kw in msg_lower for kw in appt_keywords):
+            state["wants_appointment"] = True
 
+    logger.info("plumbing_enriched",
+        session_id=state.get("session_id"),
+        collected={f: state.get(f) for f in _REQUIRED_FIELDS},
+        issue_type=state.get("issue_type"),
+        is_emergency=_is_emergency(state),
+        wants_appointment=state.get("wants_appointment"),
+    )
     state["duration_ms"] = _elapsed(start)
     return state
+
 
 # ── 3. Check completion ───────────────────────────────────────────────────────
 
@@ -193,7 +197,6 @@ async def node_score_lead(state: PlumbingState) -> PlumbingState:
     start = time.perf_counter()
     state["last_node"] = "score_lead"
 
-    # Emergency fast-path — skip LLM, always hot
     if _is_emergency(state):
         state["score"]        = "hot"
         state["score_reason"] = "Emergency plumbing — immediate dispatch."
@@ -203,10 +206,8 @@ async def node_score_lead(state: PlumbingState) -> PlumbingState:
 
     urgency = state.get("urgency") or state.get("ai_urgency", "normal")
     urgency_map = {
-        "emergency": "emergency",
-        "urgent":    "high",
-        "routine":   "normal",
-        "normal":    "normal",
+        "emergency": "emergency", "urgent": "high",
+        "routine": "normal", "normal": "normal",
     }
 
     snapshot = LeadEnrichment(
@@ -240,18 +241,15 @@ async def node_score_lead(state: PlumbingState) -> PlumbingState:
 
 async def node_finalize_and_deliver(state: PlumbingState) -> PlumbingState:
     """
-    DB → Sheets + Email + WhatsApp (parallel) → HubSpot CRM.
-
-    Each step is isolated: a failure in any one never blocks the rest.
-    Emergency SMS fires last, after the delivery pipeline completes.
+    DB → delivery pipeline (Sheets + Email + WhatsApp + HubSpot).
+    Emergency SMS fires last if applicable.
+    Each step isolated — failure never blocks the rest.
     """
     start = time.perf_counter()
     state["last_node"] = "delivery"
 
-    # Skip spam and explicitly dropped leads
     if state.get("is_spam") or state.get("next_step") == "drop":
-        logger.info("plumbing_delivery_skipped",
-                    reason="spam_or_drop",
+        logger.info("plumbing_delivery_skipped", reason="spam_or_drop",
                     session_id=state.get("session_id"))
         state["duration_ms"] = _elapsed(start)
         return state
@@ -277,28 +275,19 @@ async def node_finalize_and_deliver(state: PlumbingState) -> PlumbingState:
         logger.error("plumbing_db_failed", error=str(exc),
                      session_id=state.get("session_id"))
 
-    # ── Step 2: Sheets + Email + WhatsApp (via delivery pipeline) ────────────
+    # ── Step 2: Sheets + Email + WhatsApp + HubSpot ───────────────────────────
     try:
         from tools.delivery_tools import run_delivery_pipeline
-        await run_delivery_pipeline(state)
-    except Exception as exc:
-        logger.error("delivery_pipeline_failed", error=str(exc),
-                     session_id=state.get("session_id"))
-        # Fallback: direct SMS if the whole pipeline collapses
-        _send_fallback_sms(state)
-
-    # ── Step 3: HubSpot CRM sync ──────────────────────────────────────────────
-    try:
-        from tools.hubspot_tools import hubspot_tools
-        hs_results = await hubspot_tools.sync_lead(state)
-        logger.info("hubspot_sync_complete",
+        pipeline_results = await run_delivery_pipeline(state)
+        logger.info("plumbing_pipeline_complete",
                     session_id=state.get("session_id"),
-                    **hs_results)
+                    **{k: v for k, v in pipeline_results.items() if k != "hubspot"})
     except Exception as exc:
-        logger.error("hubspot_sync_failed", error=str(exc),
+        logger.error("plumbing_pipeline_failed", error=str(exc),
                      session_id=state.get("session_id"))
+        await _send_fallback_sms(state)
 
-    # ── Step 4: Emergency SMS (additional to WhatsApp, via Twilio SMS) ───────
+    # ── Step 3: Emergency SMS (additional channel) ────────────────────────────
     if _is_emergency(state) and state.get("phone"):
         await _send_emergency_sms(state)
 
@@ -307,14 +296,10 @@ async def node_finalize_and_deliver(state: PlumbingState) -> PlumbingState:
 
 
 async def _send_emergency_sms(state: PlumbingState) -> None:
-    """Fire-and-forget emergency SMS. Isolated so it never blocks delivery."""
     try:
-        import asyncio
         from twilio.rest import Client
         from core.config import settings
-
-        phone = state.get("phone", "")
-        to_number = phone if phone.startswith("+") else f"+{phone}"
+        phone = _normalize_phone(state.get("phone", ""))
         body = (
             f"Emergency plumber dispatched to {state.get('address', 'your location')}. "
             "Keep main shutoff CLOSED. Tech calls in 15 min."
@@ -323,7 +308,7 @@ async def _send_emergency_sms(state: PlumbingState) -> None:
         await asyncio.to_thread(
             client.messages.create,
             from_=settings.TWILIO_FROM_NUMBER,
-            to=to_number,
+            to=phone,
             body=body,
         )
         logger.info("emergency_sms_sent", session_id=state.get("session_id"))
@@ -332,40 +317,25 @@ async def _send_emergency_sms(state: PlumbingState) -> None:
                      session_id=state.get("session_id"))
 
 
-def _send_fallback_sms(state: PlumbingState) -> None:
-    """
-    Best-effort synchronous fallback SMS when the async delivery pipeline
-    collapses entirely. Uses asyncio.run only if no loop is running.
-    """
-    import asyncio
-    from twilio.rest import Client
-    from core.config import settings
-
-    phone = state.get("phone") or ""
+async def _send_fallback_sms(state: PlumbingState) -> None:
+    """Last-resort SMS when the entire delivery pipeline fails."""
+    phone = state.get("phone")
     if not phone:
         return
-
-    async def _send():
-        try:
-            to_number = phone if phone.startswith("+") else f"+{phone}"
-            body = (
-                f"Sorry, we're having trouble processing your request. "
-                f"Please call us directly at {settings.PLUMBER_PHONE_NUMBER}."
-            )
-            client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-            await asyncio.to_thread(
-                client.messages.create,
-                from_=settings.TWILIO_FROM_NUMBER,
-                to=to_number,
-                body=body,
-            )
-            logger.info("fallback_sms_sent", session_id=state.get("session_id"))
-        except Exception as exc:
-            logger.error("fallback_sms_failed", error=str(exc),
-                         session_id=state.get("session_id"))
-
     try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(_send())
-    except RuntimeError:
-        asyncio.run(_send())
+        from twilio.rest import Client
+        from core.config import settings
+        client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+        await asyncio.to_thread(
+            client.messages.create,
+            from_=settings.TWILIO_FROM_NUMBER,
+            to=_normalize_phone(phone),
+            body=(
+                "Sorry, we're having trouble processing your request. "
+                f"Please call us directly at {settings.PLUMBER_PHONE_NUMBER}."
+            ),
+        )
+        logger.info("fallback_sms_sent", session_id=state.get("session_id"))
+    except Exception as exc:
+        logger.error("fallback_sms_failed", error=str(exc),
+                     session_id=state.get("session_id"))
