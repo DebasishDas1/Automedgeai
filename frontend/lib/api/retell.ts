@@ -9,10 +9,11 @@ export interface WebCallSession {
   call_id:      string;
 }
 
-export async function createWebCall(): Promise<WebCallSession> {
+export async function createWebCall(type?: string): Promise<WebCallSession> {
   const res = await fetch(`${baseUrl()}/api/v1/retell/create-web-call`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: type || null }),
   });
 
   if (!res.ok) {

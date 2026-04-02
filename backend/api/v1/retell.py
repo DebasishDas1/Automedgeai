@@ -21,6 +21,9 @@ logger = structlog.get_logger(__name__)
 router = APIRouter()
 
 
+class WebCallRequest(BaseModel):
+    type: str | None = None
+
 class WebCallResponse(BaseModel):
     access_token: str
     call_id: str
@@ -31,7 +34,7 @@ class WebCallResponse(BaseModel):
     response_model=WebCallResponse,
     summary="Create a new web call session",
 )
-async def create_web_call(request: Request):
+async def create_web_call(request: Request, payload: WebCallRequest | None = None):
     """
     Called by the frontend to get an access token for starting a web call.
     """
@@ -43,11 +46,16 @@ async def create_web_call(request: Request):
     try:
         # Use the singleton client from app.state
         client = request.app.state.retell
+        
+        dynamic_variables = {}
+        if payload and payload.type:
+            dynamic_variables["industry"] = payload.type
 
         # FIX (CRITICAL): SDK is synchronous. Wrap in thread for async FastAPI worker.
         web_call_response = await asyncio.to_thread(
             client.web_call.create,
             agent_id=settings.RETELL_AGENT_ID,
+            retell_llm_dynamic_variables=dynamic_variables if dynamic_variables else None,
         )
 
         return {

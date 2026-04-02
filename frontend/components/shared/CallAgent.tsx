@@ -34,70 +34,72 @@ export const CallAgent = ({ type }: CallAgentProp) => {
   const retellClientRef = useRef<any>(null);
 
   useEffect(() => {
+    let isCancelled = false;
+    let localClient: any = null;
+
     if (!open) {
       if (retellClientRef.current) {
         retellClientRef.current.stopCall();
+        retellClientRef.current = null;
       }
       setStatus("idle");
       return;
     }
 
-    const startCall = async () => {
+    const initAndStartCall = async () => {
       try {
         setStatus("connecting");
         
-        // 1. Get session from backend
-        const { access_token } = await createWebCall();
+        const { access_token } = await createWebCall(type);
+        if (isCancelled) return;
+
+        const { RetellWebClient } = await import("retell-client-js-sdk");
+        if (isCancelled) return;
         
-        // 2. Initialize Retell client if not already
-        if (!RetellWebClient) {
-          const mod = await import("retell-client-js-sdk");
-          RetellWebClient = mod.RetellWebClient;
-        }
+        localClient = new RetellWebClient();
+        retellClientRef.current = localClient;
 
-        if (!retellClientRef.current) {
-          retellClientRef.current = new RetellWebClient();
-          
-          retellClientRef.current.on("call_started", () => {
-            console.log("Call started");
-            setStatus("active");
-          });
-
-          retellClientRef.current.on("call_ended", () => {
-            console.log("Call ended");
-            setStatus("idle");
-            setOpen(false);
-          });
-
-          retellClientRef.current.on("error", (err: any) => {
-            console.error("Retell error:", err);
-            setStatus("error");
-          });
-        }
-
-        // 3. Start the call
-        await retellClientRef.current.startCall({
-          accessToken: access_token,
+        localClient.on("call_started", () => {
+          if (!isCancelled) setStatus("active");
         });
 
+        localClient.on("call_ended", () => {
+          if (!isCancelled) {
+            setStatus("idle");
+            setOpen(false);
+          }
+        });
+
+        localClient.on("error", (err: any) => {
+          console.error("Retell error:", err);
+          if (!isCancelled) setStatus("error");
+        });
+
+        await localClient.startCall({ accessToken: access_token });
+
       } catch (err) {
+        if (!isCancelled) setStatus("error");
         console.error("Failed to start call:", err);
-        setStatus("error");
       }
     };
 
-    startCall();
+    initAndStartCall();
 
     return () => {
-      if (retellClientRef.current) {
-        retellClientRef.current.stopCall();
+      isCancelled = true;
+      if (localClient) {
+        localClient.stopCall();
+      }
+      if (retellClientRef.current === localClient) {
+        retellClientRef.current = null;
       }
     };
-  }, [open]);
+  }, [open, type]);
 
   const handleStop = () => {
     if (retellClientRef.current) {
       retellClientRef.current.stopCall();
+      retellClientRef.current = null;
     }
     setOpen(false);
   };
@@ -143,15 +145,22 @@ export const CallAgent = ({ type }: CallAgentProp) => {
       >
         <DialogHeader className="text-center w-full">
           <DialogTitle className="text-3xl sm:text-4xl font-bold tracking-tight text-center">
-            {status === "connecting" ? "Initializing..." : 
-             status === "active" ? "AI Agent Live" : 
-             status === "error" ? "Connection Failed" : "Let's talk"}
+            {status === "connecting"
+              ? "Initializing..."
+              : status === "active"
+                ? "AI Agent Live"
+                : status === "error"
+                  ? "Connection Failed"
+                  : "Let's talk"}
           </DialogTitle>
           <p className="text-muted-foreground mt-2">
-            {status === "active" ? "Connected and listening..." : 
-             status === "connecting" ? "Setting up your secure line." : 
-             status === "error" ? "Please check your mic and try again." : 
-             "Our AI agent is ready to help you."}
+            {status === "active"
+              ? "Connected and listening..."
+              : status === "connecting"
+                ? "Setting up your secure line."
+                : status === "error"
+                  ? "Please check your mic and try again."
+                  : "Our AI agent is ready to help you."}
           </p>
         </DialogHeader>
 
@@ -163,35 +172,44 @@ export const CallAgent = ({ type }: CallAgentProp) => {
               scale: status === "active" ? [1, 1.3, 1] : [1, 1.15, 1],
               opacity: status === "active" ? [0.3, 0.6, 0.3] : [0.2, 0.35, 0.2],
             }}
-            transition={{ duration: status === "active" ? 2 : 4, repeat: Infinity, ease: "easeInOut" }}
-            className={`absolute w-40 h-40 ${status === "error" ? 'bg-destructive/20' : 'bg-accent/20'} rounded-full blur-[60px]`}
+            transition={{
+              duration: status === "active" ? 2 : 4,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className={`absolute w-40 h-40 ${status === "error" ? "bg-destructive/20" : "bg-accent/20"} rounded-full blur-[60px]`}
           />
 
           {/* Staggered Ripples */}
-          {(status === "active" || status === "connecting") && [1, 2, 3].map((i) => (
-            <m.div
-              key={i}
-              animate={{
-                scale: [1, 2.5],
-                opacity: [0.4, 0],
-              }}
-              transition={{
-                duration: status === "active" ? 2 : 3,
-                repeat: Infinity,
-                delay: i * 0.6,
-                ease: "easeOut",
-              }}
-              className="absolute w-24 h-24 border border-accent/40 rounded-full"
-            />
-          ))}
+          {(status === "active" || status === "connecting") &&
+            [1, 2, 3].map((i) => (
+              <m.div
+                key={i}
+                animate={{
+                  scale: [1, 2.5],
+                  opacity: [0.4, 0],
+                }}
+                transition={{
+                  duration: status === "active" ? 2 : 3,
+                  repeat: Infinity,
+                  delay: i * 0.6,
+                  ease: "easeOut",
+                }}
+                className="absolute w-24 h-24 border border-accent/40 rounded-full"
+              />
+            ))}
 
           {/* Core Icon Container */}
           <m.div
-            animate={status === "active" ? { scale: [1, 1.1, 1] } : { scale: [1, 1.05, 1] }}
+            animate={
+              status === "active"
+                ? { scale: [1, 1.1, 1] }
+                : { scale: [1, 1.05, 1] }
+            }
             transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
             className={`
               relative z-10 w-24 h-24 rounded-full 
-              ${status === "error" ? 'bg-destructive' : 'bg-accent'} 
+              ${status === "error" ? "bg-destructive" : "bg-accent"} 
               flex items-center justify-center 
               shadow-2xl shadow-accent/40
             `}
@@ -211,6 +229,7 @@ export const CallAgent = ({ type }: CallAgentProp) => {
         <div className="flex flex-col gap-3 w-full">
           <Button
             onClick={handleStop}
+            disabled={status === "connecting"}
             variant={status === "error" ? "outline" : "default"}
             className="
                 rounded-2xl h-14 text-lg font-semibold w-full
@@ -225,13 +244,17 @@ export const CallAgent = ({ type }: CallAgentProp) => {
               </>
             ) : status === "error" ? (
               "Try Again"
-            ) : (status === "connecting" ? "Connecting..." : "Stop Agent")}
+            ) : status === "connecting" ? (
+              "Connecting..."
+            ) : (
+              "Stop Agent"
+            )}
           </Button>
-          
+
           {status === "active" && (
-             <p className="text-[10px] text-center text-muted-foreground uppercase tracking-widest">
-                Secure encrypted web call
-             </p>
+            <p className="text-[10px] text-center text-muted-foreground uppercase tracking-widest">
+              Secure encrypted web call
+            </p>
           )}
         </div>
       </DialogContent>
