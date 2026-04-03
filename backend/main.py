@@ -12,7 +12,6 @@ from core.exceptions import (
     automedge_exception_handler,
     generic_exception_handler,
 )
-from sqlalchemy import text
 from api.router import router
 from workflows.registry import registry
 from fastapi.middleware.gzip import GZipMiddleware
@@ -64,7 +63,22 @@ async def lifespan(app: FastAPI):
         await registry.initialize()          # compile all graphs now, not on first hit
         init_firebase()                      # eliminates concurrent-init race condition
 
-        # Initialize Retell client once for pooling
+        # FIX: Retell SDK accepts api_key=None at construction time — it only
+        # validates on the first API call. That meant startup_complete could log
+        # with a None key, app.state.retell would be set, and the 500 would
+        # only surface at request time. Fail fast here so the operator sees
+        # the problem immediately on boot.
+        if not settings.RETELL_API_KEY:
+            raise RuntimeError(
+                "RETELL_API_KEY is not set. "
+                "Check that backend/.env exists and contains RETELL_API_KEY."
+            )
+        if not settings.RETELL_AGENT_ID:
+            raise RuntimeError(
+                "RETELL_AGENT_ID is not set. "
+                "Check that backend/.env exists and contains RETELL_AGENT_ID."
+            )
+
         app.state.retell = Retell(api_key=settings.RETELL_API_KEY)
 
         logger.info("startup_complete")

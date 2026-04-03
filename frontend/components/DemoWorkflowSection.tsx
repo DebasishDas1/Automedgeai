@@ -13,6 +13,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { memo } from "react";
 
 // ─────────────────────────────────────────
@@ -136,14 +137,14 @@ const DemoCard = memo(({ index, demo }: any) => {
           relative h-full p-6 md:p-8 rounded-4xl
           bg-slate-900/5 dark:bg-slate-900/40 border border-white/10
           backdrop-blur-2xl transition-all duration-500
-          hover:border-accent/30 hover:bg-white/5 dark:hover:bg-slate-800/60
+          hover:border-accent/30 hover:bg-white/5 dark:hover:bg-slate-900/40
           flex flex-col items-center text-center gap-5 shadow-2xl
         "
         >
           <div className="absolute left-1/2 -top-1.5 -translate-x-1/2 w-4 h-4 rounded-full bg-background border-2 border-border/80 group-hover:bg-accent group-hover:border-accent/40 shadow-sm transition-all z-20" />
 
           <div
-            className={`shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center border transition-all duration-500 group-hover:-translate-y-1 group-hover:rotate-6 ${themeStyles[theme]}`}
+            className={`shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center border ${themeStyles[theme]}`}
           >
             <Icon size={32} strokeWidth={2} />
           </div>
@@ -180,7 +181,7 @@ export function DemoWorkflowSection() {
     >
       {/* Background: Digital Canvas */}
       <div
-        className="absolute inset-0 pointer-events-none -z-20 opacity-[0.04] dark:opacity-[0.08]"
+        className="absolute inset-0 pointer-events-none -z-20 opacity-[0.03] dark:opacity-[0.10] text-foreground/30"
         style={{
           backgroundImage:
             "radial-gradient(circle, currentColor 1.5px, transparent 1.5px)",
@@ -211,47 +212,96 @@ export function DemoWorkflowSection() {
       </div>
 
       {/* Graph Area */}
-      <div className="relative flex flex-col items-center gap-32 md:gap-40 max-w-6xl mx-auto">
+      <div className="relative flex flex-col items-center gap-32 md:gap-40 max-w-6xl mx-auto w-full">
         {/* Trigger Node */}
         <div className="relative z-10">
           <motion.div
             whileHover={{ scale: 1.05 }}
-            className="px-8 py-5 rounded-4xl bg-slate-900 dark:bg-slate-800 text-white border border-white/10 flex items-center gap-5 shadow-3xl group cursor-pointer"
+            className="px-8 py-5 rounded-4xl 
+               bg-background/60 backdrop-blur-md 
+               text-foreground 
+               flex items-center gap-5 
+               shadow-3xl group cursor-pointer 
+               border border-border/40
+               shadow-2xl
+               "
           >
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
-              <MousePointer2 className="w-6 h-6 text-amber-500" />
+            {/* Icon Bubble */}
+            <div
+              className="w-12 h-12 rounded-2xl 
+                 flex items-center justify-center
+                 bg-amber-500/15 dark:bg-amber-400/15
+                 border border-amber-500/30 dark:border-amber-400/30"
+            >
+              <MousePointer2 className="w-6 h-6 text-amber-600 dark:text-amber-400" />
             </div>
+
+            {/* Text */}
             <div className="text-left">
-              <p className="text-[10px] font-black uppercase text-amber-500/60 tracking-widest leading-none mb-1.5">
+              <p
+                className="text-[10px] font-black uppercase tracking-widest leading-none mb-1 
+                     text-amber-600/60 dark:text-amber-400/60"
+              >
                 Inbound Hook
               </p>
-              <p className="text-lg font-bold text-white leading-none">
+              <p className="text-lg font-bold leading-none text-foreground">
                 New Lead Inquiry
               </p>
             </div>
-            <div className="w-3 h-3 rounded-full bg-amber-500 animate-pulse ml-6 shadow-[0_0_15px_rgba(245,158,11,0.8)]" />
+
+            {/* Pulsing Status Dot */}
+            <div
+              className="w-3 h-3 rounded-full ml-6
+                 animate-pulse
+                 bg-amber-500 dark:bg-amber-400
+                 shadow-[0_0_15px_rgba(245,158,11,0.6)] 
+                 dark:shadow-[0_0_15px_rgba(251,191,36,0.6)]"
+            />
           </motion.div>
-          <div className="absolute left-1/2 -bottom-2.5 -translate-x-1/2 w-5 h-5 rounded-full bg-white border-4 border-slate-900 shadow-xl" />
+
+          {/* Pointer bubble */}
+          <div
+            className="absolute left-1/2 -bottom-2.5 -translate-x-1/2 
+               w-5 h-5 rounded-full 
+               bg-background border-4 border-border
+               shadow-xl"
+          />
         </div>
 
         {/* Central Core */}
-        <div className="relative z-10 w-full flex justify-center">
+        <div className="relative z-10 w-full flex justify-center items-center mx-auto">
           <motion.div
             animate={{ y: [0, -6, 0] }}
             transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-            className="w-36 h-36 md:w-52 md:h-52 rounded-[3.5rem] bg-accent text-accent-foreground flex items-center justify-center shadow-[0_0_100px_rgba(29,158,117,0.2)] border-4 border-accent/20 relative group overflow-hidden"
+            className="
+              w-36 h-36 md:w-52 md:h-52 
+              rounded-[3.5rem] 
+              flex items-center justify-center 
+              bg-accent 
+              border-4 border-accent/20 
+              overflow-hidden relative
+              shadow-[0_0_80px_rgba(29,158,117,0.25)]
+              dark:shadow-[0_0_90px_rgba(29,158,117,0.4)]
+            "
           >
-            <Zap className="w-16 h-16 md:w-28 md:h-28 fill-current drop-shadow-2xl animate-pulse" />
-            <div className="absolute left-1/2 -top-2.5 -translate-x-1/2 w-6 h-6 rounded-full bg-white border-4 border-accent shadow-2xl" />
-            <div className="absolute left-1/2 -bottom-2.5 -translate-x-1/2 w-8 h-4 bg-white border-x-4 border-accent" />
+            <Image
+              src="/short-logo.png"
+              alt="AutomEdge Logo"
+              fill
+              sizes="150px"
+              className="
+                object-contain 
+                pointer-events-none 
+                select-none
+                p-3 md:p-4
+              "
+            />
           </motion.div>
-
           {/* Corrected SVG ViewBox and Paths */}
           <svg
-            className="absolute inset-0 w-full h-full pointer-events-none -z-10"
+            className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[800px] pointer-events-none -z-10"
             viewBox="0 0 100 800"
-            preserveAspectRatio="none"
-            style={{ overflow: "visible" }}
+            preserveAspectRatio="xMidYMid slice"
           >
             <defs>
               <linearGradient
@@ -275,20 +325,18 @@ export function DemoWorkflowSection() {
             <BezierEdge d="M 50 160 Q 50 250, 75 320" delay={0.3} />
           </svg>
         </div>
-
         {/* Industry Matrix */}
-        <div className="w-full relative px-6 -mt-20">
+        <div className="w-full relative -mt-20 flex justify-center px-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 md:gap-x-24 gap-y-16 md:gap-y-24 max-w-6xl mx-auto">
             {DEMOS.map((demo, index) => (
               <DemoCard key={demo.id} demo={demo} index={index} />
             ))}
           </div>
         </div>
-
         {/* Final Out */}
-        <div className="mt-16 relative z-10">
+        <div className="mt-16 relative z-10 flex justify-center w-full">
           <div className="absolute left-1/2 -top-20 -translate-x-1/2 w-1 h-20 bg-linear-to-b from-accent/10 to-accent/40 -z-10" />
-          <div className="px-12 py-6 rounded-4xl border border-white/10 bg-slate-900/50 backdrop-blur-2xl flex items-center gap-6 group hover:border-accent/40 transition-all shadow-3xl">
+          <div className="px-12 py-6 rounded-4xl border border-white/10 shadow-2xl backdrop-blur-2xl flex items-center gap-6 group hover:border-accent/40 transition-all shadow-3xl">
             <Database className="w-6 h-6 text-accent animate-pulse" />
             <div className="flex flex-col gap-1 text-left">
               <span className="text-[11px] font-black uppercase tracking-[0.3em] text-accent/60 group-hover:text-accent transition-colors">

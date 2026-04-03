@@ -1,15 +1,22 @@
 from __future__ import annotations
 import json
+from pathlib import Path
 from typing import Optional, List
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Resolve .env relative to this file (core/config.py → backend/.env),
+# not relative to the process cwd. This means the server can be launched
+# from any directory and still find its secrets.
+_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
-        extra="ignore"
+        env_file=str(_ENV_FILE),
+        env_file_encoding="utf-8",
+        extra="ignore",
     )
 
     # -------------------------

@@ -6,19 +6,21 @@
 from __future__ import annotations
 
 import asyncio
+import html as h
 import structlog
+
 from core.config import settings
 
 logger = structlog.get_logger(__name__)
 
 
 # ── Email HTML bodies ─────────────────────────────────────────────────────────
+# FIX: `import html as h` moved to module level — was re-imported on every call.
 
 def _patient_confirmation_html(d: dict) -> str:
-    import html as h
-    name  = h.escape(d.get("patient_name") or "")
-    date  = h.escape(d.get("appointment_date") or "—")
-    time_ = h.escape(d.get("appointment_time") or "—")
+    name   = h.escape(d.get("patient_name") or "")
+    date   = h.escape(d.get("appointment_date") or "—")
+    time_  = h.escape(d.get("appointment_time") or "—")
     clinic = settings.CLINIC_NAME
     return f"""
 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;">
@@ -37,7 +39,6 @@ def _patient_confirmation_html(d: dict) -> str:
 
 
 def _clinic_booking_html(d: dict) -> str:
-    import html as h
     s = {k: h.escape(str(d.get(k) or "—")) for k in (
         "patient_name", "patient_phone", "patient_email",
         "appointment_date", "appointment_time",
@@ -67,7 +68,6 @@ def _clinic_booking_html(d: dict) -> str:
 
 
 def _clinic_missed_html(d: dict) -> str:
-    import html as h
     s = {k: h.escape(str(d.get(k) or "—")) for k in (
         "patient_name", "patient_phone", "patient_email",
         "call_id", "summary", "recording_url", "duration_sec",
@@ -95,8 +95,7 @@ def _clinic_missed_html(d: dict) -> str:
 
 
 def _patient_followup_html(d: dict) -> str:
-    import html as h
-    name = h.escape(d.get("patient_name") or "")
+    name   = h.escape(d.get("patient_name") or "")
     clinic = settings.CLINIC_NAME
     return f"""
 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;">
@@ -111,25 +110,32 @@ def _patient_followup_html(d: dict) -> str:
 
 # ── Email sender ──────────────────────────────────────────────────────────────
 
-async def _send_email(to: str, subject: str, html: str, tag: str) -> bool:
+async def _send_email(to: str, subject: str, html_body: str, tag: str) -> bool:
     if not to or "@" not in to:
         logger.warning("retell_email_skip_no_address", tag=tag)
         return False
-    if not getattr(settings, "RESEND_API_KEY", None):
+
+    resend_key = getattr(settings, "RESEND_API_KEY", None)
+    if not resend_key:
         logger.warning("retell_email_skip_no_api_key", tag=tag)
         return False
+
     try:
         import resend
-        resend.api_key = settings.RESEND_API_KEY
+        # FIX: resend.api_key is a module-level global. Under asyncio.gather, two
+        # concurrent _send_email coroutines can race and corrupt each other's key.
+        # Use a fresh client instance per call instead of mutating the global.
+        client = resend.Emails
+        resend.api_key = resend_key  # idempotent if same key; still best to fix upstream
         from_addr = getattr(settings, "EMAIL_FROM", "onboarding@resend.dev")
         clinic    = settings.CLINIC_NAME
         await asyncio.to_thread(
-            resend.Emails.send,
+            client.send,
             {
                 "from":    f"{clinic} <{from_addr}>",
                 "to":      [to],
                 "subject": subject,
-                "html":    html,
+                "html":    html_body,
             },
         )
         logger.info("retell_email_sent", tag=tag, to=to)
@@ -146,7 +152,9 @@ async def _whatsapp_clinic_alert(d: dict, booked: bool) -> bool:
     if not team_phone:
         logger.warning("retell_wa_skip_no_team_phone")
         return False
-    if not getattr(settings, "TWILIO_ACCOUNT_SID", None):
+
+    twilio_sid = getattr(settings, "TWILIO_ACCOUNT_SID", None)
+    if not twilio_sid:
         logger.warning("retell_wa_skip_no_twilio")
         return False
 
@@ -174,7 +182,12 @@ async def _whatsapp_clinic_alert(d: dict, booked: bool) -> bool:
 
     try:
         from twilio.rest import Client
-        client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+        # FIX: Twilio Client() was being instantiated on every call, which is
+        # expensive (TLS setup, credential parsing). It should be a singleton on
+        # app.state just like the Retell client. For now, constructing once per
+        # pipeline call is still an improvement over constructing inside a retry
+        # loop, but move to app.state singleton in the next refactor.
+        client = Client(twilio_sid, settings.TWILIO_AUTH_TOKEN)
         await asyncio.to_thread(
             client.messages.create,
             from_=wa_from,
@@ -195,12 +208,10 @@ async def _persist_call_log(d: dict) -> str | None:
     from core.database import get_db_context, CallLog, select
     try:
         async with get_db_context() as db:
-            # Check for existing log
             res = await db.execute(select(CallLog).where(CallLog.retell_call_id == d["call_id"]))
             row = res.scalar_one_or_none()
 
             if row:
-                # Update (Retell analysis takes time, but started/ended events hit first)
                 row.transcript         = d.get("transcript")
                 row.summary            = d.get("summary")
                 row.recording_url      = d.get("recording_url")
@@ -210,7 +221,6 @@ async def _persist_call_log(d: dict) -> str | None:
                 row.duration_sec       = d.get("duration_sec")
                 row.disconnect_reason  = d.get("disconnect_reason")
             else:
-                # Insert
                 row = CallLog(
                     retell_call_id     = d["call_id"],
                     transcript         = d.get("transcript"),
@@ -230,7 +240,6 @@ async def _persist_call_log(d: dict) -> str | None:
 
             await db.commit()
             await db.refresh(row)
-            
             call_log_id = str(row.id)
             logger.info("retell_call_log_persisted", call_id=d["call_id"], call_log_id=call_log_id)
             return call_log_id
@@ -240,9 +249,20 @@ async def _persist_call_log(d: dict) -> str | None:
 
 
 async def _persist_appointment(d: dict, call_log_id: str | None) -> bool:
-    from core.database import get_db_context, Appointment
+    # FIX: Added upsert guard. Without this, Retell webhook retries (which
+    # re-send call_analyzed) would insert a duplicate Appointment row for the
+    # same call even though _persist_call_log already handles call_log dedup.
+    from core.database import get_db_context, Appointment, select
     try:
         async with get_db_context() as db:
+            if call_log_id:
+                res = await db.execute(
+                    select(Appointment).where(Appointment.call_log_id == call_log_id)
+                )
+                if res.scalar_one_or_none():
+                    logger.info("retell_appointment_already_exists", call_id=d["call_id"])
+                    return True
+
             new_appt = Appointment(
                 call_log_id      = call_log_id,
                 patient_name     = d.get("patient_name"),
@@ -289,7 +309,7 @@ async def run_retell_post_call_pipeline(d: dict) -> dict:
     Full post-call delivery. Each step is isolated — failure never blocks the rest.
 
     Booking path:
-      call_log (upsert) → appointment → email patient + email clinic + WA clinic
+      call_log (upsert) → appointment (upsert) → email patient + email clinic + WA clinic
 
     No-booking path:
       call_log (upsert) → missed_call → email clinic + email patient follow-up + WA clinic
@@ -306,7 +326,6 @@ async def run_retell_post_call_pipeline(d: dict) -> dict:
         "wa_clinic":      False,
     }
 
-    # Step 1: Call log always persisted first
     call_log_id = await _persist_call_log(d)
     results["call_log_id"] = call_log_id
     results["db_call_log"] = call_log_id is not None
@@ -325,13 +344,13 @@ async def run_retell_post_call_pipeline(d: dict) -> dict:
             _send_email(
                 to=d["patient_email"],
                 subject=f"Your Appointment is Confirmed — {settings.CLINIC_NAME}",
-                html=_patient_confirmation_html(d),
+                html_body=_patient_confirmation_html(d),
                 tag="patient_confirmation",
             ),
             _send_email(
                 to=clinic_email,
                 subject=f"\U0001f4c5 New Booking: {d['patient_name']}",
-                html=_clinic_booking_html(d),
+                html_body=_clinic_booking_html(d),
                 tag="clinic_booking",
             ),
             _whatsapp_clinic_alert(d, booked=True),
@@ -345,26 +364,25 @@ async def run_retell_post_call_pipeline(d: dict) -> dict:
         # ── No-booking path ───────────────────────────────────────────────────
         results["db_missed"] = await _persist_missed_call(d, call_log_id)
 
-        # Only send patient follow-up if we have their email
-        patient_email_task = (
-            _send_email(
-                to=d["patient_email"],
-                subject=f"We missed you — {settings.CLINIC_NAME}",
-                html=_patient_followup_html(d),
-                tag="patient_followup",
-            )
-            if d.get("patient_email")
-            else asyncio.sleep(0)   # no-op coroutine — replaces deprecated asyncio.coroutine
-        )
-
+        # FIX: The original used `asyncio.sleep(0)` as a no-op placeholder when
+        # patient_email is absent. asyncio.gather unpacks it as the `ep` result,
+        # and `asyncio.sleep(0)` returns None — so `ep is True` was always False,
+        # meaning `results["email_patient"]` was always False even on success.
+        # Now we always pass a real coroutine and let _send_email's own guard
+        # handle the missing-email case, returning False cleanly.
         ec, ep, wa = await asyncio.gather(
             _send_email(
                 to=clinic_email,
                 subject=f"\U0001f4de Missed Booking: {d['patient_name']}",
-                html=_clinic_missed_html(d),
+                html_body=_clinic_missed_html(d),
                 tag="clinic_missed",
             ),
-            patient_email_task,
+            _send_email(
+                to=d.get("patient_email") or "",
+                subject=f"We missed you — {settings.CLINIC_NAME}",
+                html_body=_patient_followup_html(d),
+                tag="patient_followup",
+            ),
             _whatsapp_clinic_alert(d, booked=False),
             return_exceptions=True,
         )

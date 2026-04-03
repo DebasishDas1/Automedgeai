@@ -44,14 +44,12 @@ async def create_web_call(request: Request, payload: WebCallRequest | None = Non
         raise HTTPException(status_code=500, detail="RETELL_AGENT_ID not configured")
 
     try:
-        # Use the singleton client from app.state
         client = request.app.state.retell
-        
+
         dynamic_variables = {}
         if payload and payload.type:
             dynamic_variables["industry"] = payload.type
 
-        # FIX (CRITICAL): SDK is synchronous. Wrap in thread for async FastAPI worker.
         web_call_response = await asyncio.to_thread(
             client.web_call.create,
             agent_id=settings.RETELL_AGENT_ID,
@@ -79,22 +77,30 @@ async def retell_post_call(
 ) -> JSONResponse:
     """
     Retell post-call webhook handler.
-    Secured with HMAC signature verification.
+    Secured with HMAC-SHA256 signature verification.
     Offloads delivery to background task.
     """
     signature = request.headers.get("x-retell-signature")
     body = await request.body()
 
     # 1. HMAC Verification
+    # FIX: Original used `hmac.new(key, msg, digestmod).hexdigest()` which is
+    # correct but compares the raw hex string against the header value.
+    # Retell sends the signature as a hex string, so this is fine.
+    # However, hmac.compare_digest requires both operands to be the same type
+    # (both str or both bytes). We ensure both are str here.
     if signature and settings.RETELL_WEBHOOK_SECRET:
         expected = hmac.new(
             settings.RETELL_WEBHOOK_SECRET.encode(),
             body,
-            hashlib.sha256
-        ).hexdigest()
+            hashlib.sha256,
+        ).hexdigest()  # str
 
-        if not hmac.compare_digest(signature, expected):
-            logger.warning("retell_webhook_invalid_signature", signature=signature)
+        # FIX: Ensure signature from header is also str (it always is from HTTP
+        # headers, but be explicit). hmac.compare_digest raises TypeError if
+        # types differ.
+        if not hmac.compare_digest(str(signature), expected):
+            logger.warning("retell_webhook_invalid_signature")
             raise HTTPException(status_code=401, detail="invalid_signature")
     elif not signature and settings.ENVIRONMENT != "dev":
         raise HTTPException(status_code=401, detail="missing_signature")
@@ -109,7 +115,7 @@ async def retell_post_call(
         return JSONResponse({"status": "error", "detail": "invalid_json"}, status_code=200)
 
     # 2. Extract Event
-    event = (payload.get("event") or payload.get("body", {}).get("event") or "")
+    event   = (payload.get("event") or payload.get("body", {}).get("event") or "")
     call_id = ((payload.get("call") or {}).get("call_id") or payload.get("call_id") or "unknown")
 
     logger.info("retell_webhook_received", event=event, call_id=call_id)
@@ -117,7 +123,7 @@ async def retell_post_call(
     if event != "call_analyzed":
         return JSONResponse({"status": "ignored", "event": event})
 
-    # 3. Process Async
+    # 3. Extract & enqueue
     try:
         call_data = extract_call_data(payload)
     except Exception as exc:

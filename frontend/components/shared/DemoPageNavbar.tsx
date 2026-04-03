@@ -1,180 +1,157 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
 import Image from "next/image";
+import { useState, useEffect } from "react";
+
 import { Button } from "@/components/ui/button";
 import { useDomainNavigation } from "@/hook/useDomainNavigation";
-import { Menu, X, ChevronRight } from "lucide-react";
-import { m as motion, AnimatePresence } from "framer-motion";
 
-const NAV_LINKS = [
+import {
+  Drawer,
+  DrawerTrigger,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerClose,
+} from "@/components/ui/drawer";
+
+import { Equal } from "lucide-react";
+
+const navItems = [
   { label: "How it Works", href: "#how-it-works" },
-  { label: "ROI Calculator", href: "#roi" },
-  { label: "FAQ", href: "#faq" },
+  { label: "Roi Calculator", href: "#roi" },
+  { label: "Faq", href: "#faq" },
 ];
+
+function NavLinks({
+  className = "",
+  closeOnClick = false,
+}: {
+  className?: string;
+  closeOnClick?: boolean;
+}) {
+  return (
+    <div className={`flex flex-col lg:flex-row gap-6 ${className}`}>
+      {navItems.map((item) => {
+        const linkEl = (
+          <Link
+            href={item.href}
+            className="font-semibold hover:text-accent lg:py-4"
+          >
+            {item.label}
+          </Link>
+        );
+
+        return closeOnClick ? (
+          <DrawerClose key={item.label} asChild>
+            {linkEl}
+          </DrawerClose>
+        ) : (
+          <div key={item.label}>{linkEl}</div>
+        );
+      })}
+    </div>
+  );
+}
 
 export const DemoPageNavbar = () => {
   const { goHome } = useDomainNavigation();
+
   const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
 
   useEffect(() => {
-    const handleScroll = () => {
-      const scrolled = window.scrollY > 20;
-      setIsScrolled(scrolled);
+    const updateScroll = () => {
+      const y = window.scrollY;
+      setIsScrolled(y > 20);
 
-      const totalHeight =
-        document.documentElement.scrollHeight - window.innerHeight;
-      const progress = totalHeight > 0 ? (window.scrollY / totalHeight) * 100 : 0;
-      setScrollProgress(progress);
+      const total = document.documentElement.scrollHeight - window.innerHeight;
+      setScrollProgress(total ? (y / total) * 100 : 0);
     };
-    
-    // Initial call
-    handleScroll();
-    
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+
+    updateScroll();
+    window.addEventListener("scroll", updateScroll, { passive: true });
+    return () => window.removeEventListener("scroll", updateScroll);
   }, []);
 
-  const scrollToSection = (id: string) => {
-    setIsMobileMenuOpen(false);
-    const element = document.getElementById(id.replace("#", ""));
-    element?.scrollIntoView({ behavior: "smooth" });
-  };
-
   return (
-    <>
-      <nav
-        className={`fixed top-0 z-50 w-full transition-all duration-300 border-b ${
-          isScrolled
-            ? "bg-background/80 backdrop-blur-xl border-border/50 py-3 shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
-            : "bg-transparent border-transparent py-5"
-        }`}
-      >
-        {/* Scroll Progress Bar */}
-        {/* Scroll Progress Bar (Subtle) */}
-        <div
-          className="absolute top-0 left-0 h-px bg-accent/50 transition-all duration-300 pointer-events-none"
-          style={{ width: `${scrollProgress}%` }}
-        />
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 lg:px-8">
-          {/* Logo */}
-          <div className="flex items-center gap-8">
-            <Link
-              href="/"
-              onClick={(e) => {
-                // Optional: only override if using subdomains
-                e.preventDefault();
-                goHome();
-              }}
-              className="relative flex items-center w-[140px] h-[40px] cursor-pointer hover:opacity-80 transition-opacity"
-            >
-              <Image
-                src="/AutomEdge-logo-light.png"
-                alt="AutomEdge logo"
-                fill
-                sizes="140px"
-                priority
-                className="object-contain dark:hidden select-none"
+    <nav
+      className={`fixed top-0 w-full z-50 transition-all duration-300 border-b ${
+        isScrolled
+          ? "bg-background/80 backdrop-blur-xl border-border/50 py-3 shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
+          : "bg-transparent border-transparent py-5"
+      }`}
+    >
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 lg:px-8">
+        {/* Logo */}
+        <button
+          onClick={goHome}
+          className="relative w-[140px] h-[40px] cursor-pointer hover:opacity-80 transition-opacity"
+        >
+          <Image
+            src="/AutomEdge-logo-light.png"
+            alt="AutomEdge logo"
+            fill
+            priority
+            sizes="140px"
+            className="object-contain dark:hidden select-none pointer-events-none"
+          />
+          <Image
+            src="/AutomEdge-logo.png"
+            alt="AutomEdge logo"
+            fill
+            priority
+            sizes="140px"
+            className="object-contain hidden dark:block select-none pointer-events-none"
+          />
+        </button>
+
+        {/* Desktop CTA + Mobile Menu */}
+        <div className="flex items-center gap-4">
+          {/* Desktop CTA */}
+          <Link href="#calendar" className="hidden sm:block">
+            <Button className="px-6 py-5 bg-cta text-[#412402] font-bold shadow-xl glow-cta hover:-translate-y-0.5 transition-all rounded-xl">
+              Book My Demo
+            </Button>
+          </Link>
+
+          {/* Mobile Drawer */}
+          <Drawer direction="top">
+            <DrawerTrigger className="md:hidden p-2 rounded-md hover:bg-muted">
+              <Equal className="h-6 w-6" />
+            </DrawerTrigger>
+
+            <DrawerContent className="pt-10 px-10 bg-background/60 backdrop-blur-xl">
+              <DrawerHeader onClick={goHome}>
+                <DrawerTitle className="text-start text-muted-foreground text-base">
+                  AutomEdge
+                </DrawerTitle>
+                <DrawerDescription className="text-start text-muted-foreground font-thin text-sm">
+                  AI-Powered Lead Response for Home Service Businesses
+                </DrawerDescription>
+              </DrawerHeader>
+
+              <NavLinks
+                closeOnClick
+                className="text-3xl font-bold py-10 text-primary ml-3"
               />
-              <Image
-                src="/AutomEdge-logo.png"
-                alt="AutomEdge logo"
-                fill
-                sizes="140px"
-                priority
-                className="object-contain hidden dark:block select-none"
-              />
-            </Link>
-          </div>
 
-          {/* Desktop CTA & Mobile Toggle */}
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:block">
-              <Link href="#calendar">
-                <Button className="px-6 py-5 bg-cta glow-cta text-[#412402] font-bold shadow-xl hover:-translate-y-0.5 transition-all rounded-xl">
-                  Book My Demo
-                </Button>
-              </Link>
-            </div>
-
-            {/* Mobile Menu Toggle */}
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              aria-label="Toggle Mobile Menu"
-              className="p-2 -mr-2 md:hidden text-foreground hover:bg-muted/50 rounded-lg transition-colors"
-            >
-              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      {/* Mobile Menu Overlay */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="fixed inset-0 z-60 bg-background/60 backdrop-blur-sm md:hidden"
-            />
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed right-0 top-0 z-70 h-full w-[280px] bg-card border-l border-border/50 p-8 shadow-2xl md:hidden"
-            >
-              <div className="flex flex-col h-full">
-                <div className="flex justify-between items-center mb-10">
-                  <span className="font-outfit font-black text-xl tracking-tight">
-                    Menu
-                  </span>
-                  <button
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    aria-label="Close Mobile Menu"
-                  >
-                    <X size={24} className="text-muted-foreground" />
-                  </button>
-                </div>
-
-                <div className="flex flex-col gap-6">
-                  {NAV_LINKS.map((link) => (
-                    <a
-                      key={link.label}
-                      href={link.href}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        scrollToSection(link.href);
-                      }}
-                      className="text-xl font-bold text-foreground text-left flex items-center justify-between group cursor-pointer"
-                    >
-                      {link.label}
-                      <ChevronRight className="w-5 h-5 text-accent opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
-                    </a>
-                  ))}
-                </div>
-
-                <div className="mt-auto">
-                  <Link
-                    href="#calendar"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <Button className="w-full py-6 bg-cta glow-cta text-black font-bold shadow-xl rounded-2xl hover:bg-cta-hover">
+              <DrawerFooter className="mt-auto flex justify-start pb-10">
+                <DrawerClose asChild>
+                  <Link href="#calendar">
+                    <Button className="text-3xl font-black text-accent dark:text-cta bg-transparent p-0">
                       Book My Demo
                     </Button>
                   </Link>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </>
+                </DrawerClose>
+              </DrawerFooter>
+            </DrawerContent>
+          </Drawer>
+        </div>
+      </div>
+    </nav>
   );
 };

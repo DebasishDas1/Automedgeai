@@ -13,8 +13,10 @@ import { m } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import { createWebCall } from "@/lib/api/retell";
 
-// Lazy load Retell SDK to avoid SSR issues
-let RetellWebClient: any;
+// FIX: Removed dead module-level `let RetellWebClient: any` declaration.
+// It was declared but never assigned here — the real import happens inside
+// the effect via dynamic import(). The stale declaration caused confusion
+// and shadowed the destructured name inside initAndStartCall.
 
 type CallAgentProp = {
   type:
@@ -31,17 +33,24 @@ type CallStatus = "idle" | "connecting" | "active" | "error";
 export const CallAgent = ({ type }: CallAgentProp) => {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<CallStatus>("idle");
+
+  // FIX: Split into two refs so handleStop can always reach the client even
+  // when the effect cleanup races with an in-flight initAndStartCall.
+  // `retellClientRef` holds the live client once startCall() resolves.
+  // `pendingClientRef` holds the client the moment it is constructed,
+  // so handleStop can abort it before startCall() returns.
   const retellClientRef = useRef<any>(null);
+  const pendingClientRef = useRef<any>(null);
 
   useEffect(() => {
     let isCancelled = false;
-    let localClient: any = null;
 
     if (!open) {
-      if (retellClientRef.current) {
-        retellClientRef.current.stopCall();
-        retellClientRef.current = null;
-      }
+      // Tear down any live or pending client when the dialog closes.
+      const client = retellClientRef.current ?? pendingClientRef.current;
+      client?.stopCall();
+      retellClientRef.current = null;
+      pendingClientRef.current = null;
       setStatus("idle");
       return;
     }
@@ -49,34 +58,43 @@ export const CallAgent = ({ type }: CallAgentProp) => {
     const initAndStartCall = async () => {
       try {
         setStatus("connecting");
-        
+
         const { access_token } = await createWebCall(type);
         if (isCancelled) return;
 
+        // Lazy import to avoid SSR issues — intentional, kept as-is.
         const { RetellWebClient } = await import("retell-client-js-sdk");
         if (isCancelled) return;
-        
-        localClient = new RetellWebClient();
-        retellClientRef.current = localClient;
 
-        localClient.on("call_started", () => {
-          if (!isCancelled) setStatus("active");
+        const client = new RetellWebClient();
+
+        // FIX: Assign to pendingClientRef immediately after construction so
+        // handleStop can call stopCall() even while startCall() is awaiting.
+        pendingClientRef.current = client;
+
+        client.on("call_started", () => {
+          if (!isCancelled) {
+            retellClientRef.current = client;
+            pendingClientRef.current = null;
+            setStatus("active");
+          }
         });
 
-        localClient.on("call_ended", () => {
+        client.on("call_ended", () => {
           if (!isCancelled) {
+            retellClientRef.current = null;
+            pendingClientRef.current = null;
             setStatus("idle");
             setOpen(false);
           }
         });
 
-        localClient.on("error", (err: any) => {
+        client.on("error", (err: unknown) => {
           console.error("Retell error:", err);
           if (!isCancelled) setStatus("error");
         });
 
-        await localClient.startCall({ accessToken: access_token });
-
+        await client.startCall({ accessToken: access_token });
       } catch (err) {
         if (!isCancelled) setStatus("error");
         console.error("Failed to start call:", err);
@@ -87,20 +105,24 @@ export const CallAgent = ({ type }: CallAgentProp) => {
 
     return () => {
       isCancelled = true;
-      if (localClient) {
-        localClient.stopCall();
-      }
-      if (retellClientRef.current === localClient) {
-        retellClientRef.current = null;
-      }
+      // Clean up whichever ref is populated at teardown time.
+      const client = retellClientRef.current ?? pendingClientRef.current;
+      client?.stopCall();
+      retellClientRef.current = null;
+      pendingClientRef.current = null;
     };
   }, [open, type]);
 
   const handleStop = () => {
-    if (retellClientRef.current) {
-      retellClientRef.current.stopCall();
-      retellClientRef.current = null;
-    }
+    // FIX: Original only checked retellClientRef, which is only assigned after
+    // call_started fires. If the user clicks End Call while we are still
+    // awaiting startCall() (status === "connecting"), the client existed in
+    // the local variable but not in the ref — stopCall() was never called,
+    // leaving a zombie WebRTC session open. Now we also check pendingClientRef.
+    const client = retellClientRef.current ?? pendingClientRef.current;
+    client?.stopCall();
+    retellClientRef.current = null;
+    pendingClientRef.current = null;
     setOpen(false);
   };
 
@@ -111,15 +133,14 @@ export const CallAgent = ({ type }: CallAgentProp) => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           className="
-            fixed bottom-28 right-8 
-            w-16 h-16 rounded-full 
+            fixed bottom-28 right-8
+            w-16 h-16 rounded-full
             flex items-center justify-center
             bg-accent text-white
             shadow-[0_12px_40px_rgba(0,0,0,0.35)]
             z-50
           "
         >
-          {/* Subtle pulse for mobile attention */}
           <m.div
             animate={{ scale: [1, 1.2], opacity: [0.1, 0] }}
             transition={{ duration: 2, repeat: Infinity }}
@@ -129,13 +150,12 @@ export const CallAgent = ({ type }: CallAgentProp) => {
         </m.button>
       </DialogTrigger>
 
-      {/* Responsive Dialog */}
       <DialogContent
         className="
-          w-[calc(100%-2.5rem)] sm:max-w-md 
-          h-auto min-h-[380px] sm:min-h-[420px] 
-          rounded-[32px] sm:rounded-[40px] 
-          border border-white/10 
+          w-[calc(100%-2.5rem)] sm:max-w-md
+          h-auto min-h-[380px] sm:min-h-[420px]
+          rounded-[32px] sm:rounded-[40px]
+          border border-white/10
           backdrop-blur-3xl bg-background/80
           shadow-[0_40px_100px_-20px_rgba(0,0,0,0.55)]
           flex flex-col items-center justify-between
@@ -166,7 +186,6 @@ export const CallAgent = ({ type }: CallAgentProp) => {
 
         {/* Center Mic Visualizer */}
         <div className="relative flex items-center justify-center flex-1 w-full my-8">
-          {/* Ambient Glow */}
           <m.div
             animate={{
               scale: status === "active" ? [1, 1.3, 1] : [1, 1.15, 1],
@@ -180,15 +199,11 @@ export const CallAgent = ({ type }: CallAgentProp) => {
             className={`absolute w-40 h-40 ${status === "error" ? "bg-destructive/20" : "bg-accent/20"} rounded-full blur-[60px]`}
           />
 
-          {/* Staggered Ripples */}
           {(status === "active" || status === "connecting") &&
             [1, 2, 3].map((i) => (
               <m.div
                 key={i}
-                animate={{
-                  scale: [1, 2.5],
-                  opacity: [0.4, 0],
-                }}
+                animate={{ scale: [1, 2.5], opacity: [0.4, 0] }}
                 transition={{
                   duration: status === "active" ? 2 : 3,
                   repeat: Infinity,
@@ -199,7 +214,6 @@ export const CallAgent = ({ type }: CallAgentProp) => {
               />
             ))}
 
-          {/* Core Icon Container */}
           <m.div
             animate={
               status === "active"
@@ -208,9 +222,9 @@ export const CallAgent = ({ type }: CallAgentProp) => {
             }
             transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
             className={`
-              relative z-10 w-24 h-24 rounded-full 
-              ${status === "error" ? "bg-destructive" : "bg-accent"} 
-              flex items-center justify-center 
+              relative z-10 w-24 h-24 rounded-full
+              ${status === "error" ? "bg-destructive" : "bg-accent"}
+              flex items-center justify-center
               shadow-2xl shadow-accent/40
             `}
           >
@@ -232,10 +246,10 @@ export const CallAgent = ({ type }: CallAgentProp) => {
             disabled={status === "connecting"}
             variant={status === "error" ? "outline" : "default"}
             className="
-                rounded-2xl h-14 text-lg font-semibold w-full
-                shadow-lg shadow-accent/20 transition-all active:scale-95
-                flex items-center justify-center gap-2
-              "
+              rounded-2xl h-14 text-lg font-semibold w-full
+              shadow-lg shadow-accent/20 transition-all active:scale-95
+              flex items-center justify-center gap-2
+            "
           >
             {status === "active" ? (
               <>
