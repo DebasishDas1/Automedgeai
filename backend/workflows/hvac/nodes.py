@@ -1,18 +1,18 @@
 # workflows/hvac/nodes.py
 from __future__ import annotations
 
-import asyncio
 import time
-from datetime import datetime, timezone
-
 import structlog
-from langchain_core.messages import SystemMessage
 
-from core.database import Lead, get_db_context
-from llm import llm
 from tools.ai_tools import ai_tools
-from workflows.shared import build_validate_input_node, build_check_completion_node, build_chat_reply_node
-from workflows.base import build_lc_messages, field_missing, get_appt_slots
+from workflows.shared import (
+    build_validate_input_node,
+    build_enrich_node,
+    build_check_completion_node,
+    build_chat_reply_node,
+    build_delivery_node,
+)
+from workflows.base import field_missing
 from workflows.hvac.prompts import HVAC_EXPERT_SYSTEM
 from workflows.hvac.schema import LeadEnrichment, LeadScore
 from workflows.hvac.state import HvacState
@@ -24,125 +24,30 @@ _COLLECTED_FIELDS = ("issue", "description", "urgency", "address", "name", "phon
 _REQUIRED_FIELDS  = ("issue", "urgency", "address")
 
 
-def _utcnow() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-def _elapsed(start: float) -> int:
-    return int((time.perf_counter() - start) * 1000)
-
-
-def _migrate_legacy_fields(state: HvacState) -> None:
+def _migrate_legacy_fields(state: dict) -> None:
     """Fix old sessions that used 'location' instead of 'address'."""
     if field_missing(state, "address") and state.get("location"):
         state["address"] = state.pop("location")
-    # Promote ai_urgency → urgency after 2+ turns if still unset
-    if field_missing(state, "urgency") and state.get("ai_urgency"):
-        if int(state.get("turn_count", 0)) >= 2:
-            state["urgency"] = state["ai_urgency"]
-            logger.debug("urgency_promoted", urgency=state["urgency"],
-                         session_id=state.get("session_id"))
 
 
 # ── 1. Validate ───────────────────────────────────────────────────────────────
-
-async def node_validate_input(state: HvacState) -> HvacState:
-    start = time.perf_counter()
-    state["last_node"] = "validate_input"
-    state["error"] = None
-
-    _migrate_legacy_fields(state)
-
-    msgs = state.get("messages", [])
-    if not msgs:
-        state["error"] = "empty_input"
-        state["duration_ms"] = _elapsed(start)
-        return state
-
-    last = msgs[-1]
-    if last.get("role") != "user" or not (last.get("content") or "").strip():
-        state["error"] = "empty_input"
-        state["duration_ms"] = _elapsed(start)
-        return state
-
-    if int(state.get("turn_count", 0)) >= _MAX_TURNS:
-        state["is_complete"] = True
-        logger.warning("session_max_turns_reached", session_id=state.get("session_id"))
-
-    state["duration_ms"] = _elapsed(start)
-    return state
-
+node_validate_input = build_validate_input_node(_MAX_TURNS, migrate_fn=_migrate_legacy_fields)
 
 # ── 2. Enrich ─────────────────────────────────────────────────────────────────
-
-async def node_enrich_lead(state: HvacState) -> HvacState:
-    start = time.perf_counter()
-    state["last_node"] = "enrich_lead"
-
-    messages = state.get("messages", [])
-    last_user = next(
-        (m["content"] for m in reversed(messages) if m.get("role") == "user"), None
-    )
-
-    # A. Extract contact fields from history (focus on latest user input)
-    if last_user:
-        try:
-            extraction = await ai_tools.extract_fields(last_user)
-            if extraction:
-                # Latest extracted non-null values always overwrite existing state.
-                # This ensures corrections like changing a ZIP or phone update correctly.
-                for field, value in extraction.items():
-                    if value is None:
-                        continue
-
-                    # Handle common LLM extraction variations
-                    if field == "location" and not extraction.get("address"):
-                        state["address"] = value
-                    elif field in _COLLECTED_FIELDS:
-                        state[field] = value
-        except Exception as exc:
-            logger.warning("field_extraction_failed", error=str(exc),
-                           session_id=state.get("session_id"))
-
-    # B. Classify full history — assessment only, not a collected field
-    try:
-        classification = await ai_tools.classify_conversation(messages)
-        if classification:
-            state["intent"]     = classification.get("intent", "service_request")
-            state["is_spam"]    = classification.get("is_spam", False)
-            state["ai_summary"] = classification.get("summary")
-            state["ai_urgency"] = classification.get("urgency", "normal")
-            # Overwrite urgency from AI after 2+ turns to form an opinion. 
-            # Note: extraction already sets 'urgency' above if found.
-            if int(state.get("turn_count", 0)) >= 2:
-                state["urgency"] = state["ai_urgency"]
-                logger.debug("urgency_promoted", urgency=state["urgency"],
-                             session_id=state.get("session_id"))
-    except Exception as exc:
-        logger.warning("classification_failed", error=str(exc),
-                       session_id=state.get("session_id"))
-        state.setdefault("is_spam", False)
-        state.setdefault("intent", "service_request")
-
-    logger.info("lead_enriched",
-        session_id=state.get("session_id"),
-        collected={f: state.get(f) for f in _REQUIRED_FIELDS},
-    )
-    state["duration_ms"] = _elapsed(start)
-    return state
-
+node_enrich_lead = build_enrich_node(
+    extract_fn=ai_tools.extract_fields,
+    required_fields=_REQUIRED_FIELDS,
+    collected_fields=_COLLECTED_FIELDS,
+)
 
 # ── 3. Check completion ───────────────────────────────────────────────────────
-
 node_check_completion = build_check_completion_node(_REQUIRED_FIELDS)
 
-
 # ── 4. Chat reply ─────────────────────────────────────────────────────────────
-
 node_chat_reply = build_chat_reply_node(HVAC_EXPERT_SYSTEM, _COLLECTED_FIELDS)
 
 
 # ── 5. Score ──────────────────────────────────────────────────────────────────
-
 async def node_score_lead(state: HvacState) -> HvacState:
     start = time.perf_counter()
     state["last_node"] = "score_lead"
@@ -166,59 +71,14 @@ async def node_score_lead(state: HvacState) -> HvacState:
         state["score_reason"] = score_data.score_reason
         state["next_step"]    = score_data.next_step
     except Exception as exc:
-        logger.error("score_lead_failed", error=str(exc), session_id=state.get("session_id"))
+        logger.error("score_lead_failed", error=str(exc), sid=state.get("session_id"))
         state["score"]        = "warm"
         state["score_reason"] = "Scoring failed — defaulted to warm."
         state["next_step"]    = "schedule_callback"
 
-    state["duration_ms"] = _elapsed(start)
+    state["duration_ms"] = int((time.perf_counter() - start) * 1000)
     return state
 
 
 # ── 6. Deliver ────────────────────────────────────────────────────────────────
-
-async def node_finalize_and_deliver(state: HvacState) -> HvacState:
-    """
-    Full delivery pipeline: DB → Sheets → Email → WhatsApp.
-    Each step is isolated — failure in one never blocks the others.
-    """
-    start = time.perf_counter()
-    state["last_node"] = "delivery"
-
-    if state.get("is_spam") or state.get("next_step") == "drop":
-        logger.info("delivery_skipped", session_id=state.get("session_id"))
-        state["duration_ms"] = _elapsed(start)
-        return state
-
-    # 1. DB persistence
-    try:
-        async with get_db_context() as db:
-            lead = Lead(
-                name=state.get("name"),
-                email=state.get("email"),
-                phone=state.get("phone"),
-                issue=state.get("issue"),
-                address=state.get("address"),
-                vertical=state.get("vertical", "hvac"),
-                session_id=state.get("session_id"),
-                score=state.get("score"),
-                summary=state.get("ai_summary"),
-            )
-            db.add(lead)
-            await db.commit()
-            logger.info("lead_persisted", session_id=state.get("session_id"))
-    except Exception as exc:
-        logger.error("db_persistence_failed", error=str(exc),
-                     session_id=state.get("session_id"))
-
-    # 2. Sheets + Email + WhatsApp via delivery pipeline
-    try:
-        from tools.delivery_tools import run_delivery_pipeline
-        results = await run_delivery_pipeline(state)
-        state["delivery_results"] = results
-    except Exception as exc:
-        logger.error("delivery_pipeline_failed", error=str(exc),
-                     session_id=state.get("session_id"))
-
-    state["duration_ms"] = _elapsed(start)
-    return state
+node_finalize_and_deliver = build_delivery_node(vertical="hvac")

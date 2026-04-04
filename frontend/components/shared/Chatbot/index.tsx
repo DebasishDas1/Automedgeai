@@ -159,7 +159,6 @@ export function Chatbot({ vertical = "general" }: ChatbotProps) {
         let hasAddedInitialBotChunk = false;
 
         await streamChatMessage(
-          apiVertical,
           currentSessionId,
           msg,
           (chunk) => {

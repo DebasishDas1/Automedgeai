@@ -1,8 +1,8 @@
 // lib/api/chat.ts
-// All chat API calls go through here.
-//
-// .env.local:        NEXT_PUBLIC_API_URL=http://localhost:8000
-// Vercel dashboard:  NEXT_PUBLIC_API_URL=https://automedge-backend.onrender.com
+/**
+ * Frontend API client for Automedge Unified Chat.
+ * Optimized for consolidated backend endpoints (/api/v1/chat/*).
+ */
 
 const baseUrl = () =>
   process.env.NEXT_PUBLIC_API_URL ?? "https://automedge-backend.onrender.com";
@@ -22,7 +22,13 @@ export interface SendMessageResponse {
   fields_collected: Record<string, unknown>;
 }
 
-// Typed API error so callers can distinguish network vs HTTP failures
+export interface MessageMetadata {
+  is_complete:      boolean;
+  turn:             number;
+  appt_booked:      boolean;
+  fields_collected: Record<string, unknown>;
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -34,10 +40,6 @@ export class ApiError extends Error {
 }
 
 // ── Core fetch wrapper ────────────────────────────────────────────────────────
-// FIX: added AbortController + timeout so a hung Render.com cold-start doesn't
-// freeze the UI forever. Default 15 s — generous enough for cold starts.
-// FIX: throws ApiError (typed) instead of bare Error so callers can branch on
-// status code (e.g. show "session expired" on 404, not generic error message).
 
 async function post<T>(
   path: string,
@@ -63,7 +65,6 @@ async function post<T>(
     return res.json() as Promise<T>;
   } catch (err) {
     if (err instanceof ApiError) throw err;
-    // AbortError from timeout or network failure
     if (err instanceof DOMException && err.name === "AbortError") {
       throw new ApiError(408, "Request timed out. The server may be waking up — try again.");
     }
@@ -73,47 +74,38 @@ async function post<T>(
   }
 }
 
-// Maps frontend-facing vertical names to backend URL slugs.
-// CRITICAL: backend uses /pest-control (hyphen) but stores "pest_control" (underscore).
-const VERTICAL_URL_MAP: Record<string, string> = {
-  general:      "hvac",
-  pest_control: "pest-control",
-};
-const toApiVertical = (v: string): string => VERTICAL_URL_MAP[v] ?? v;
-
 // ── API calls ─────────────────────────────────────────────────────────────────
 
+/**
+ * Starts a new chat session. The vertical (hvac, plumbing, etc.) is now 
+ * sent in the request body to facilitate a universal /start endpoint.
+ */
 export const startChatSession = (
   vertical: string,
   userInfo?: { name: string; email: string; phone: string },
   source = "web_chat",
-) =>
-  post<StartChatResponse>(
-    `/api/v1/chat/${toApiVertical(vertical)}/start`,
-    { source, ...userInfo },
-    20_000, // longer timeout for session start (cold start on Render)
+) => {
+  // Normalize vertical names (e.g. general -> hvac)
+  const backendVertical = vertical === "general" ? "hvac" : vertical;
+  
+  return post<StartChatResponse>(
+    "/api/v1/chat/start",
+    { vertical: backendVertical, source, ...userInfo },
+    20_000,
   );
-
-export const sendChatMessage = undefined; // Deleted blocking sendChatMessage
-
-export interface MessageMetadata {
-  is_complete:      boolean;
-  turn:             number;
-  appt_booked:      boolean;
-  fields_collected: Record<string, unknown>;
-}
+};
 
 /**
  * SSE streaming wrapper for chat messages.
+ * Unified endpoint: session_id automatically determines the vertical context.
  */
 export async function streamChatMessage(
-  vertical:   string,
   session_id: string,
   message:    string,
   onChunk:    (chunk: string) => void,
   onMetadata: (meta: MessageMetadata) => void,
 ) {
-  const res = await fetch(`${baseUrl()}/api/v1/chat/${toApiVertical(vertical)}/message/stream`, {
+  const res = await fetch(`${baseUrl()}/api/v1/chat/message/stream`, {
     method:  "POST",
     headers: { "Content-Type": "application/json" },
     body:    JSON.stringify({ session_id, message }),

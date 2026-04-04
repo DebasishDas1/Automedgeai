@@ -20,24 +20,35 @@ def _elapsed(start: float) -> int:
     return int((time.perf_counter() - start) * 1000)
 
 
-def build_validate_input_node(_MAX_TURNS: int = 10) -> Callable:
+def build_validate_input_node(_MAX_TURNS: int = 10, migrate_fn: Optional[Callable] = None) -> Callable:
+    """
+    Standard validation: checks for empty input and turn limits.
+    Supports an optional migration function for legacy state fixes.
+    """
     async def node_validate_input(state: dict) -> dict:
         start = time.perf_counter()
         state["last_node"] = "validate_input"
         state["error"] = None
+
+        if migrate_fn:
+            migrate_fn(state)
+
         msgs = state.get("messages", [])
         if not msgs:
             state["error"] = "empty_input"
             state["duration_ms"] = _elapsed(start)
             return state
+
         last = msgs[-1]
         if last.get("role") != "user" or not (last.get("content") or "").strip():
             state["error"] = "empty_input"
             state["duration_ms"] = _elapsed(start)
             return state
+
         if int(state.get("turn_count", 0)) >= _MAX_TURNS:
             state["is_complete"] = True
             logger.warning("session_max_turns_reached", session_id=state.get("session_id"))
+
         state["duration_ms"] = _elapsed(start)
         return state
     return node_validate_input
@@ -76,6 +87,7 @@ def build_check_completion_node(required_fields: tuple[str, ...]) -> Callable:
             issue_type == "emergency"
             or urgency == "emergency"
             or urgency == "urgent"
+            or state.get("_is_emergency_logic", False)  # Vertical-specific flag
         )
         if is_emergency:
             state["is_complete"] = True
@@ -103,6 +115,77 @@ def build_check_completion_node(required_fields: tuple[str, ...]) -> Callable:
 
         return state
     return node_check_completion
+
+
+def build_enrich_node(
+    extract_fn: Callable,
+    required_fields: tuple[str, ...],
+    collected_fields: tuple[str, ...],
+    is_emergency_fn: Optional[Callable] = None,
+) -> Callable:
+    """
+    Standardized enrichment node builder.
+    - Runs extraction and classification in parallel.
+    - Automates field merging and location normalization.
+    - Detects appointment intent.
+    - Updates vertical-specific emergency flags.
+    """
+    async def node_enrich_lead(state: dict) -> dict:
+        from tools.ai_tools import ai_tools
+        import asyncio
+        start = time.perf_counter()
+        state["last_node"] = "enrich_lead"
+
+        messages = state.get("messages", [])
+        last_user = next(
+            (m["content"] for m in reversed(messages) if m.get("role") == "user"), None
+        )
+
+        async def _noop(): return None
+
+        extraction, classification = await asyncio.gather(
+            extract_fn(last_user) if last_user else _noop(),
+            ai_tools.classify_conversation(messages),
+            return_exceptions=True,
+        )
+
+        # 1. Extraction Merge
+        if isinstance(extraction, Exception):
+            logger.warning("extraction_failed", error=str(extraction), sid=state.get("session_id"))
+        elif extraction:
+            for field, value in extraction.items():
+                if value is None: continue
+                if field == "location" and not extraction.get("address"):
+                    state["address"] = value
+                elif field in collected_fields:
+                    state[field] = value
+
+        # 2. Classification Merge
+        if isinstance(classification, Exception):
+            logger.warning("classification_failed", error=str(classification), sid=state.get("session_id"))
+        elif classification:
+            state["intent"]     = classification.get("intent", "service_request")
+            state["is_spam"]    = classification.get("is_spam", False)
+            state["ai_summary"] = classification.get("summary")
+            state["ai_urgency"] = classification.get("urgency", "normal")
+            if int(state.get("turn_count", 0)) >= 2:
+                state["urgency"] = state["ai_urgency"]
+
+        # 3. Vertical Logic (Emergency + Appt Intent)
+        if is_emergency_fn:
+            state["_is_emergency_logic"] = is_emergency_fn(state)
+        
+        if last_user and not state.get("wants_appointment"):
+            appt_keywords = {"book", "schedule", "appointment", "appt", "slot", "tomorrow"}
+            if any(kw in last_user.lower() for kw in appt_keywords):
+                state["wants_appointment"] = True
+
+        logger.info("enrich_complete", sid=state.get("session_id"),
+                    req_met=all(not field_missing(state, f) for f in required_fields))
+        state["duration_ms"] = _elapsed(start)
+        return state
+
+    return node_enrich_lead
 
 
 def build_chat_reply_node(
@@ -230,6 +313,56 @@ def build_chat_graph(state_schema: Any, nodes_dict: dict, always_reply: bool = T
         g.add_edge("reply", END)
         return g.compile()
     return builder
+
+
+def build_delivery_node(vertical: str, emergency_sms_fn: Optional[Callable] = None) -> Callable:
+    """
+    Standardized delivery node builder.
+    - DB persistence.
+    - Delivery pipeline (Sheets, Email, WhatsApp, HubSpot).
+    - Optional emergency SMS trigger.
+    """
+    async def node_finalize_and_deliver(state: dict) -> dict:
+        from core.database import Lead, get_db_context
+        from tools.delivery_tools import run_delivery_pipeline
+        start = time.perf_counter()
+        state["last_node"] = "delivery"
+
+        if state.get("is_spam") or state.get("next_step") == "drop":
+            logger.info("delivery_skipped", sid=state.get("session_id"))
+            return state
+
+        # 1. DB
+        try:
+            async with get_db_context() as db:
+                lead = Lead(
+                    name=state.get("name"), email=state.get("email"),
+                    phone=state.get("phone"), issue=state.get("issue"),
+                    address=state.get("address"), vertical=vertical,
+                    session_id=state.get("session_id"), score=state.get("score"),
+                    summary=state.get("ai_summary"),
+                )
+                db.add(lead)
+                await db.commit()
+                logger.info("db_persisted", sid=state.get("session_id"))
+        except Exception as exc:
+            logger.error("db_failed", error=str(exc), sid=state.get("session_id"))
+
+        # 2. Pipeline
+        try:
+            await run_delivery_pipeline(state)
+            logger.info("delivery_pipeline_ok", sid=state.get("session_id"))
+        except Exception as exc:
+            logger.error("delivery_pipeline_failed", error=str(exc), sid=state.get("session_id"))
+
+        # 3. Emergency SMS
+        if emergency_sms_fn:
+            await emergency_sms_fn(state)
+
+        state["duration_ms"] = _elapsed(start)
+        return state
+
+    return node_finalize_and_deliver
 
 
 def build_post_chat_graph(state_schema: Any, nodes_dict: dict) -> Callable:

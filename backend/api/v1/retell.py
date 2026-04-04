@@ -67,87 +67,78 @@ async def create_web_call(request: Request, payload: WebCallRequest | None = Non
 
 @router.post(
     "/post-call",
-    operation_id="retell_post_call",
+    operation_id="retell_webhook_post_call",
     summary="Retell AI post-call webhook",
-    response_description="Accepted for async processing",
+    status_code=200,
 )
 async def retell_post_call(
     request: Request,
     background_tasks: BackgroundTasks,
 ) -> JSONResponse:
     """
-    Retell post-call webhook handler.
-    Secured with HMAC-SHA256 signature verification.
-    Offloads delivery to background task.
+    Handles Retell AI webhooks for call analysis.
+    Verifies x-retell-signature using HMAC-SHA256 for security.
+    Offloads CRM/Sheets/Twilio processing to an async background task.
     """
     signature = request.headers.get("x-retell-signature")
     body = await request.body()
 
-    # 1. HMAC Verification
-    # FIX: Original used `hmac.new(key, msg, digestmod).hexdigest()` which is
-    # correct but compares the raw hex string against the header value.
-    # Retell sends the signature as a hex string, so this is fine.
-    # However, hmac.compare_digest requires both operands to be the same type
-    # (both str or both bytes). We ensure both are str here.
-    if signature and settings.RETELL_WEBHOOK_SECRET:
+    # 1. Signature Verification (HMAC-SHA256)
+    if settings.RETELL_WEBHOOK_SECRET:
+        if not signature:
+             raise HTTPException(status_code=401, detail="missing_signature")
+        
         expected = hmac.new(
             settings.RETELL_WEBHOOK_SECRET.encode(),
             body,
-            hashlib.sha256,
-        ).hexdigest()  # str
+            hashlib.sha256
+        ).hexdigest()
 
-        # FIX: Ensure signature from header is also str (it always is from HTTP
-        # headers, but be explicit). hmac.compare_digest raises TypeError if
-        # types differ.
-        if not hmac.compare_digest(str(signature), expected):
-            logger.warning("retell_webhook_invalid_signature")
+        if not hmac.compare_digest(signature, expected):
+            logger.warning("retell_auth_failed", sig=signature[:8])
             raise HTTPException(status_code=401, detail="invalid_signature")
-    elif not signature and settings.ENVIRONMENT != "dev":
-        raise HTTPException(status_code=401, detail="missing_signature")
-
-    if not body:
-        return JSONResponse({"status": "ok", "detail": "empty_body"})
 
     try:
         payload = json.loads(body)
-    except Exception as exc:
-        logger.warning("retell_webhook_bad_json", error=str(exc))
-        return JSONResponse({"status": "error", "detail": "invalid_json"}, status_code=200)
+    except json.JSONDecodeError:
+        return JSONResponse({"status": "bad_json"}, status_code=400)
 
-    # 2. Extract Event
-    event   = (payload.get("event") or payload.get("body", {}).get("event") or "")
-    call_id = ((payload.get("call") or {}).get("call_id") or payload.get("call_id") or "unknown")
+    # 2. Extract Event & ID
+    event   = payload.get("event") or (payload.get("body", {}).get("event"))
+    call_id = (payload.get("call", {}).get("call_id") or payload.get("call_id", "unknown"))
 
-    logger.info("retell_webhook_received", event=event, call_id=call_id)
-
+    # We only care when the call analysis is ready (transcript/summary finished)
     if event != "call_analyzed":
         return JSONResponse({"status": "ignored", "event": event})
 
-    # 3. Extract & enqueue
+    # 3. Analyze & Enqueue
+    logger.info("retell_analyzing", call_id=call_id)
     try:
         call_data = extract_call_data(payload)
+        
+        # Enqueue heavy I/O (HubSpot, Sheets, Twilio)
+        background_tasks.add_task(
+            _run_pipeline,
+            call_data,
+            request.app.state.twilio,
+            request.app.state.resend
+        )
+
+        return JSONResponse({
+            "status": "accepted",
+            "call_id": call_id,
+            "booked": call_data.get("appointment_booked", False)
+        })
+
     except Exception as exc:
-        logger.error("retell_extraction_failed", call_id=call_id, error=str(exc))
-        return JSONResponse({"status": "extraction_failed", "call_id": call_id})
-
-    background_tasks.add_task(
-        _run_pipeline,
-        call_data,
-        getattr(request.app.state, "twilio", None),
-        getattr(request.app.state, "resend", None),
-    )
-
-    return JSONResponse({
-        "status": "accepted",
-        "call_id": call_data["call_id"],
-        "appointment_booked": call_data["appointment_booked"],
-    })
+        logger.error("retell_webhook_error", call_id=call_id, error=str(exc))
+        return JSONResponse({"status": "error", "detail": "processing_failed"}, status_code=500)
 
 
 async def _run_pipeline(call_data: dict, twilio_client=None, resend_client=None) -> None:
-    """Background task for post-call processing."""
+    """Background task for post-call delivery pipeline."""
     try:
         results = await run_retell_post_call_pipeline(call_data, twilio_client, resend_client)
-        logger.info("retell_pipeline_done", call_id=call_data["call_id"], results=results)
+        logger.info("retell_pipeline_success", call_id=call_data.get("call_id"), results=results)
     except Exception as exc:
-        logger.error("retell_pipeline_error", call_id=call_data.get("call_id"), error=str(exc))
+        logger.error("retell_pipeline_failed", call_id=call_data.get("call_id"), error=str(exc))

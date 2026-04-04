@@ -23,6 +23,7 @@ Vertical = Literal["hvac", "pest_control", "plumbing", "roofing"]
 # ── Request / Response schemas ────────────────────────────────────────────────
 
 class StartRequest(BaseModel):
+    vertical: Vertical  # hvac, plumbing, roofing, pest_control
     source: str | None = None
     name: str | None = None
     email: str | None = None
