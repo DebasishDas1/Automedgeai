@@ -192,7 +192,11 @@ async def run_post_chat(state: dict, vertical: str, app_state: Any = None) -> No
             await db.commit()
             logger.info("post_chat_complete", session_id=session_id)
     except Exception as exc:
-        logger.error("post_chat_failed", session_id=session_id, error=str(exc))
+        logger.error(
+            "post_chat_failed",
+            session_id=session_id[:20] if session_id else "unknown",
+            error_type=type(exc).__name__,
+        )
 
 
 async def save_session_by_id(db: AsyncSession, session_id: str, state: dict) -> None:

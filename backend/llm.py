@@ -77,7 +77,10 @@ class LLMManager:
                     await cache.set("llm", key, resp, ttl=1800)
                 return resp
             except Exception as exc:
-                logger.error("llm_primary_failed", error=str(exc))
+                logger.error(
+                    "llm_primary_failed",
+                    error_type=type(exc).__name__,
+                )
                 if target is not self._ollama:
                     logger.warning("llm_fallback_to_ollama")
                     return await self._call(self._ollama, trimmed, **kwargs)

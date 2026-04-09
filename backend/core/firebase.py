@@ -23,21 +23,27 @@ def init_firebase():
                 try:
                     cred = credentials.Certificate(json.loads(json_blob))
                 except Exception as e:
-                    logger.warning(f"Failed to parse FIREBASE_CREDENTIALS_JSON: {e}")
+                    logger.warning(
+                        "firebase_credentials_parse_failed",
+                        error_type=type(e).__name__,
+                    )
             
             if not cred and cred_path and os.path.exists(cred_path):
                 cred = credentials.Certificate(cred_path)
             
             if not cred:
-                logger.error("No Firebase credentials found in settings or ENV (FIREBASE_CREDENTIALS)")
+                logger.error("firebase_no_credentials_found")
                 return
 
             if not firebase_admin._apps:
                 firebase_admin.initialize_app(cred)
             _firebase_initialized = True
-            logger.info("Firebase Admin SDK initialized successfully.")
+            logger.info("firebase_initialized_successfully")
         except Exception as e:
-            logger.warning(f"Failed to initialize Firebase Admin SDK: {e}")
+            logger.warning(
+                "firebase_initialization_failed",
+                error_type=type(e).__name__,
+            )
 
 def verify_token(token: str) -> dict:
     """

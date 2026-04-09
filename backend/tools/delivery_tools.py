@@ -68,8 +68,9 @@ async def store_lead(state: dict, score: str, app_state=None) -> bool:
         )
         return True
     except Exception as exc:
-        logger.error("store_lead_failed", error=str(exc),
-                     vertical=vertical, session_id=state.get("session_id"))
+        logger.error("store_lead_failed",
+                     error_type=type(exc).__name__,
+                     vertical=vertical, session_id=state.get("session_id")[:20] if state.get("session_id") else "unknown")
         return False
 
 
@@ -79,8 +80,9 @@ async def send_email_notification(state: dict, score: str, app_state=None) -> bo
         await email_tools.send_lead_notification(state, score, app_state=app_state)
         return True
     except Exception as exc:
-        logger.error("email_notification_failed", error=str(exc),
-                     session_id=state.get("session_id"))
+        logger.error("email_notification_failed",
+                     error_type=type(exc).__name__,
+                     session_id=state.get("session_id")[:20] if state.get("session_id") else "unknown")
         return False
 
 
@@ -99,8 +101,9 @@ async def send_whatsapp_notification(state: dict, app_state=None) -> bool:
         )
         return True
     except Exception as exc:
-        logger.error("whatsapp_notification_failed", error=str(exc),
-                     session_id=state.get("session_id"))
+        logger.error("whatsapp_notification_failed",
+                     error_type=type(exc).__name__,
+                     session_id=state.get("session_id")[:20] if state.get("session_id") else "unknown")
         return False
 
 
@@ -119,8 +122,9 @@ async def sync_to_hubspot(state: dict, app_state=None) -> dict:
                     session_id=state.get("session_id"))
         return results
     except Exception as exc:
-        logger.error("hubspot_sync_failed", error=str(exc),
-                     session_id=state.get("session_id"))
+        logger.error("hubspot_sync_failed",
+                     error_type=type(exc).__name__,
+                     session_id=state.get("session_id")[:20] if state.get("session_id") else "unknown")
         return {"contact_id": None, "deal_id": None, "meeting_id": None}
 
 

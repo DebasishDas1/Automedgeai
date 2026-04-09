@@ -48,7 +48,10 @@ async def create_web_call(request: Request, payload: WebCallRequest | None = Non
 
         dynamic_variables = {}
         if payload and payload.type:
-            dynamic_variables["industry"] = payload.type
+            # Sanitize type to prevent injections
+            industry_type = payload.type.strip()[:100]
+            if industry_type.isalnum() or industry_type in ["hvac", "plumbing", "roofing", "pest_control"]:
+                dynamic_variables["industry"] = industry_type
 
         web_call_response = await asyncio.to_thread(
             client.web_call.create,
@@ -61,8 +64,11 @@ async def create_web_call(request: Request, payload: WebCallRequest | None = Non
             "call_id": web_call_response.call_id,
         }
     except Exception as exc:
-        logger.error("retell_create_web_call_failed", error=str(exc))
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.error(
+            "retell_create_web_call_failed",
+            error_type=type(exc).__name__,
+        )
+        raise HTTPException(status_code=500, detail="Failed to create web call session")
 
 
 @router.post(
@@ -86,7 +92,8 @@ async def retell_post_call(
     # 1. Signature Verification (HMAC-SHA256)
     if settings.RETELL_WEBHOOK_SECRET:
         if not signature:
-             raise HTTPException(status_code=401, detail="missing_signature")
+            logger.warning("retell_webhook_missing_signature")
+            raise HTTPException(status_code=401, detail="missing_signature")
         
         expected = hmac.new(
             settings.RETELL_WEBHOOK_SECRET.encode(),
@@ -95,7 +102,10 @@ async def retell_post_call(
         ).hexdigest()
 
         if not hmac.compare_digest(signature, expected):
-            logger.warning("retell_auth_failed", sig=signature[:8])
+            logger.warning(
+                "retell_webhook_invalid_signature",
+                sig_first_8=signature[:8] if isinstance(signature, str) else "invalid",
+            )
             raise HTTPException(status_code=401, detail="invalid_signature")
 
     try:
@@ -112,7 +122,7 @@ async def retell_post_call(
         return JSONResponse({"status": "ignored", "event": event})
 
     # 3. Analyze & Enqueue
-    logger.info("retell_analyzing", call_id=call_id)
+    logger.info("retell_analyzing_call", call_id=call_id[:20] if call_id else "unknown")
     try:
         call_data = extract_call_data(payload)
         
@@ -126,12 +136,16 @@ async def retell_post_call(
 
         return JSONResponse({
             "status": "accepted",
-            "call_id": call_id,
+            "call_id": call_id[:20] if call_id else "unknown",
             "booked": call_data.get("appointment_booked", False)
         })
 
     except Exception as exc:
-        logger.error("retell_webhook_error", call_id=call_id, error=str(exc))
+        logger.error(
+            "retell_webhook_error",
+            call_id=call_id[:20] if call_id else "unknown",
+            error_type=type(exc).__name__,
+        )
         return JSONResponse({"status": "error", "detail": "processing_failed"}, status_code=500)
 
 
@@ -139,6 +153,13 @@ async def _run_pipeline(call_data: dict, twilio_client=None, resend_client=None)
     """Background task for post-call delivery pipeline."""
     try:
         results = await run_retell_post_call_pipeline(call_data, twilio_client, resend_client)
-        logger.info("retell_pipeline_success", call_id=call_data.get("call_id"), results=results)
+        logger.info(
+            "retell_pipeline_success",
+            call_id=call_data.get("call_id", "unknown")[:20],
+        )
     except Exception as exc:
-        logger.error("retell_pipeline_failed", call_id=call_data.get("call_id"), error=str(exc))
+        logger.error(
+            "retell_pipeline_failed",
+            call_id=call_data.get("call_id", "unknown")[:20],
+            error_type=type(exc).__name__,
+        )

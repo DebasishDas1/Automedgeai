@@ -94,7 +94,10 @@ class AITools:
             log.warning(f"{service}_empty", raw=resp.content[:120])
             return None
         except Exception as exc:
-            log.error(f"{service}_failed", error=str(exc))
+            log.error(
+                f"{service}_failed",
+                error_type=type(exc).__name__,
+            )
             return None
 
     async def extract_fields(self, last_user_message: str) -> dict | None:

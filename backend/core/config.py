@@ -74,6 +74,8 @@ class Settings(BaseSettings):
     HUBSPOT_STAGE_HOT: str = "3394548455"
     HUBSPOT_STAGE_WARM: str = "3394548456"
     HUBSPOT_STAGE_COLD: str = "3394548457"
+    HUBSPOT_DEAL_SCORE_PROPERTY: Optional[str] = None
+    HUBSPOT_DEAL_VERTICAL_PROPERTY: Optional[str] = None
 
     # -------------------------
     # CORS

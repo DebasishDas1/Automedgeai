@@ -62,17 +62,22 @@ async def lifespan(app: FastAPI):
             app.state.sheets = get_sheets_client()
         except Exception as exc:
             app.state.sheets = None
-            logger.warning("startup_sheets_failed", error=str(exc))
+            logger.warning(
+                "startup_sheets_failed",
+                error_type=type(exc).__name__,
+            )
 
         logger.info("startup_complete")
+        yield
     except Exception as exc:
-        logger.error("startup_failed", error=str(exc))
+        logger.error(
+            "startup_failed",
+            error_type=type(exc).__name__,
+        )
         raise
-
-    yield
-
-    logger.info("shutdown_begin")
-    try:
-        await engine.dispose()
     finally:
-        logger.info("shutdown_complete")
+        logger.info("shutdown_begin")
+        try:
+            await engine.dispose()
+        finally:
+            logger.info("shutdown_complete")

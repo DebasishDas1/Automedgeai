@@ -91,9 +91,12 @@ class EmailTools:
                     "html": html_body,
                 }
             )
-            logger.info("email_sent", score=score, to=settings.TEAM_EMAIL)
+            logger.info("email_sent", score=score, recipient_count=1)
         except Exception as exc:
-            logger.error("email_send_failed", error=str(exc))
+            logger.error(
+                "email_send_failed",
+                error_type=type(exc).__name__,
+            )
 
 
 email_tools = EmailTools()

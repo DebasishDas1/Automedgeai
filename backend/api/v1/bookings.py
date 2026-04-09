@@ -15,7 +15,12 @@ router = APIRouter()
 @router.post("/", response_model=BookingResponse, status_code=201)
 async def create_booking(body: BookingCreate, db: AsyncSession = Depends(get_db)):
     try:
-        return await booking_tools.create_booking(db, body)
+        result = await booking_tools.create_booking(db, body)
+        # Convert DB row to response model
+        return BookingResponse.model_validate(result)
+    except ValueError as e:
+        logger.warning("create_booking_validation_error", error_type=type(e).__name__)
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"create_booking: {e}")
+        logger.error("create_booking_failed", error_type=type(e).__name__)
         raise HTTPException(status_code=500, detail="Failed to save booking.")

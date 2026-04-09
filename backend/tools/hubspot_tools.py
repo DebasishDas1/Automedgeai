@@ -97,6 +97,81 @@ def _issue_field(state: dict) -> str:
     )
 
 
+def _build_contact_properties(state: dict) -> dict:
+    """
+    Build a clean HubSpot v3 contact properties object.
+    
+    Validation rules:
+    - firstname and email are required
+    - Remove all empty/None/undefined values
+    - Phone must be in E.164 format or omitted
+    - All keys must be valid HubSpot contact properties
+    
+    Returns: dict with only non-empty properties
+    Raises: ValueError if required fields are missing
+    """
+    email = state.get("email", "").strip()
+    name = (state.get("name") or "").strip()
+    phone = state.get("phone")
+    
+    # Validate required fields
+    if not email:
+        raise ValueError("email is required for HubSpot contact")
+    if not name:
+        raise ValueError("name is required for HubSpot contact")
+    
+    parts = name.split(" ", 1)
+    first = parts[0].strip()
+    last = parts[1].strip() if len(parts) > 1 else ""
+    
+    if not first:
+        raise ValueError("firstname must be non-empty")
+    
+    # Build properties — only include non-empty values
+    props = {
+        "firstname": first,
+        "email": email,
+        "hs_lead_status": "NEW",
+    }
+    
+    if last:
+        props["lastname"] = last
+    
+    phone_clean = _phone_clean(phone)
+    if phone_clean:
+        props["phone"] = phone_clean
+    
+    address = state.get("address", "").strip()
+    if address:
+        props["address"] = address
+    
+    vertical = state.get("vertical", "").strip()
+    if vertical:
+        props["vertical"] = vertical
+    
+    issue = _issue_field(state).strip()
+    if issue:
+        props["issue"] = issue
+    
+    urgency = (state.get("urgency") or state.get("ai_urgency", "")).strip()
+    if urgency:
+        props["urgency"] = urgency
+    
+    score = state.get("score", "").strip()
+    if score:
+        props["score"] = score
+    
+    summary = state.get("ai_summary", "").strip()
+    if summary:
+        props["summary"] = summary
+    
+    session_id = state.get("session_id", "").strip()
+    if session_id:
+        props["session_id"] = session_id
+    
+    return props
+
+
 # ── 1. Upsert contact ─────────────────────────────────────────────────────────
 
 async def upsert_contact(state: dict, app_state=None) -> Optional[str]:
@@ -106,31 +181,24 @@ async def upsert_contact(state: dict, app_state=None) -> Optional[str]:
 
     Custom contact properties required in HubSpot (Settings → Properties → Contact):
         vertical, issue, urgency, score, summary, session_id
+    
+    Validates payload before sending to ensure compliance with HubSpot v3 API.
     """
     log = logger.bind(service="hubspot_upsert_contact",
                       session_id=state.get("session_id"))
 
-    email = state.get("email")
-    name  = (state.get("name") or "").strip()
-    parts = name.split(" ", 1)
-    first = parts[0]
-    last  = parts[1] if len(parts) > 1 else ""
+    # Validate and build clean properties dict
+    try:
+        props = _build_contact_properties(state)
+    except ValueError as e:
+        log.error(
+            "contact_validation_failed",
+            error_type=type(e).__name__,
+            detail=str(e),
+        )
+        return None
 
-    props = {
-        "firstname":            first,
-        "lastname":             last,
-        "phone":                _phone_clean(state.get("phone")) or "",
-        "address":              state.get("address") or "",
-        "hs_lead_status":       "NEW",
-        "vertical":   state.get("vertical", ""),
-        "issue":      _issue_field(state),
-        "urgency":    state.get("urgency") or state.get("ai_urgency") or "",
-        "score":      state.get("score") or "",
-        "summary":    state.get("ai_summary") or "",
-        "session_id": state.get("session_id") or "",
-    }
-    if email:
-        props["email"] = email
+    email = state.get("email", "").strip()
 
     try:
         api = _client(app_state)
@@ -138,17 +206,17 @@ async def upsert_contact(state: dict, app_state=None) -> Optional[str]:
         # Try update-by-email first to avoid duplicates
         if email:
             try:
-                from hubspot.crm.contacts import PublicObjectSearchRequest
+                from hubspot.crm.contacts import PublicObjectSearchRequest, FilterGroup, Filter
                 search_resp = await asyncio.to_thread(
                     api.crm.contacts.search_api.do_search,
                     public_object_search_request=PublicObjectSearchRequest(
-                        filter_groups=[{
-                            "filters": [{
-                                "property_name": "email",
-                                "operator":      "EQ",
-                                "value":         email,
-                            }]
-                        }],
+                        filter_groups=[FilterGroup(
+                            filters=[Filter(
+                                property_name="email",
+                                operator="EQ",
+                                value=email,
+                            )]
+                        )],
                         properties=["id"],
                         limit=1,
                     ),
@@ -163,12 +231,24 @@ async def upsert_contact(state: dict, app_state=None) -> Optional[str]:
                             properties=props
                         ),
                     )
-                    log.info("contact_updated", contact_id=contact_id)
+                    log.info("contact_updated", contact_id=contact_id, fields=list(props.keys()))
                     return contact_id
             except Exception as exc:
                 # Log and fall through to create — don't swallow silently
-                log.warning("contact_search_failed_falling_through_to_create",
-                            error=str(exc))
+                error_detail = ""
+                if hasattr(exc, "body"):
+                    try:
+                        import json
+                        error_body = json.loads(exc.body) if isinstance(exc.body, str) else exc.body
+                        error_detail = error_body.get("message") or str(error_body)
+                    except Exception:
+                        error_detail = str(exc.body)[:200]
+                
+                log.warning(
+                    "contact_search_failed_falling_through_to_create",
+                    error_type=type(exc).__name__,
+                    error_detail=error_detail[:200] if error_detail else None,
+                )
 
         # Create new contact
         from hubspot.crm.contacts import SimplePublicObjectInputForCreate
@@ -179,11 +259,24 @@ async def upsert_contact(state: dict, app_state=None) -> Optional[str]:
             ),
         )
         contact_id = result.id
-        log.info("contact_created", contact_id=contact_id)
+        log.info("contact_created", contact_id=contact_id, fields=list(props.keys()))
         return contact_id
 
     except Exception as exc:
-        log.error("upsert_contact_failed", error=str(exc))
+        error_detail = ""
+        if hasattr(exc, "body"):
+            try:
+                import json
+                error_body = json.loads(exc.body) if isinstance(exc.body, str) else exc.body
+                error_detail = error_body.get("message") or str(error_body)
+            except Exception:
+                error_detail = str(exc.body)[:200]
+        
+        log.error(
+            "upsert_contact_failed",
+            error_type=type(exc).__name__,
+            error_detail=error_detail[:200] if error_detail else None,
+        )
         return None
 
 
@@ -195,29 +288,58 @@ async def create_deal(state: dict, contact_id: str, app_state=None) -> Optional[
     Returns the deal ID, or None on failure.
 
     Custom deal properties required in HubSpot (Settings → Properties → Deal):
-        automedge_score, automedge_vertical
+        automedge_score
+    
+    Optional deal properties may be configured via the env vars:
+        HUBSPOT_DEAL_SCORE_PROPERTY
+        HUBSPOT_DEAL_VERTICAL_PROPERTY
+
+    Note: dealname, pipeline, dealstage are optional in HubSpot v3.
+    Only include valid values to avoid API validation errors.
     """
     log = logger.bind(service="hubspot_create_deal",
                       session_id=state.get("session_id"))
 
-    vertical  = state.get("vertical", "hvac").replace("_", " ").title()
-    issue     = _issue_field(state) or "Service Request"
-    score     = state.get("score") or "warm"
-    name      = state.get("name") or "Lead"
-    address   = state.get("address") or ""
+    vertical = state.get("vertical", "hvac").replace("_", " ").title()
+    issue = _issue_field(state) or "Service Request"
+    score = state.get("score") or "warm"
+    name = state.get("name") or "Lead"
+    address = state.get("address", "").strip()
 
     deal_name = f"{vertical} — {issue} ({name})"
     if address:
         deal_name += f" — {address}"
 
-    props = {
-        "dealname":           deal_name,
-        "dealstage":          _score_to_hs_stage(score),
-        "pipeline":           _pipeline_id(),
-        "description":        state.get("ai_summary") or "",
-        "automedge_score":    score,
-        "automedge_vertical": state.get("vertical", ""),
-    }
+    # Build clean properties dict — only include valid, non-empty values
+    # dealname, pipeline, dealstage are optional in HubSpot v3
+    props = {}
+    
+    if deal_name:
+        props["dealname"] = deal_name
+    
+    # Only include dealstage if score is valid
+    if score:
+        stage = _score_to_hs_stage(score)
+        if stage and stage != "default":
+            props["dealstage"] = stage
+    
+    # Only include pipeline if it's a valid ID (not "default" string)
+    pipeline = _pipeline_id()
+    if pipeline and pipeline != "default" and pipeline.strip():
+        props["pipeline"] = pipeline
+    
+    summary = state.get("ai_summary", "").strip()
+    if summary:
+        props["description"] = summary
+    
+    score_property = settings.HUBSPOT_DEAL_SCORE_PROPERTY
+    if score_property and score:
+        props[score_property] = score
+
+    vertical_property = settings.HUBSPOT_DEAL_VERTICAL_PROPERTY
+    vert = state.get("vertical", "").strip()
+    if vertical_property and vert:
+        props[vertical_property] = vert
 
     # Insurance roofing leads get a conservative deal value for pipeline weighting
     if state.get("vertical") == "roofing" and state.get("has_insurance"):
@@ -239,17 +361,34 @@ async def create_deal(state: dict, contact_id: str, app_state=None) -> Optional[
         # (avoids magic string type IDs required by v3)
         await asyncio.to_thread(
             api.crm.associations.v4.basic_api.create_default,
-            object_type="deals",
-            object_id=deal_id,
-            to_object_type="contacts",
-            to_object_id=contact_id,
+            "deals",
+            deal_id,
+            "contacts",
+            contact_id,
         )
 
-        log.info("deal_created", deal_id=deal_id, score=score)
+        log.info("deal_created", deal_id=deal_id, score=score, fields=list(props.keys()))
         return deal_id
 
     except Exception as exc:
-        log.error("create_deal_failed", error=str(exc))
+        # Try to extract HubSpot API error details
+        error_detail = ""
+        if hasattr(exc, "body"):
+            try:
+                import json
+                error_body = json.loads(exc.body) if isinstance(exc.body, str) else exc.body
+                error_detail = error_body.get("message") or str(error_body)
+            except Exception:
+                error_detail = str(exc.body)[:200]
+
+        if not error_detail:
+            error_detail = str(exc)[:200]
+        
+        log.error(
+            "create_deal_failed",
+            error_type=type(exc).__name__,
+            error_detail=error_detail[:200] if error_detail else None,
+        )
         return None
 
 
@@ -269,7 +408,20 @@ async def update_contact(contact_id: str, updates: dict, app_state=None) -> bool
         log.info("contact_props_updated", fields=list(updates.keys()))
         return True
     except Exception as exc:
-        log.error("update_contact_failed", error=str(exc))
+        error_detail = ""
+        if hasattr(exc, "body"):
+            try:
+                import json
+                error_body = json.loads(exc.body) if isinstance(exc.body, str) else exc.body
+                error_detail = error_body.get("message") or str(error_body)
+            except Exception:
+                error_detail = str(exc.body)[:200]
+        
+        log.error(
+            "update_contact_failed",
+            error_type=type(exc).__name__,
+            error_detail=error_detail[:200] if error_detail else None,
+        )
         return False
 
 
@@ -287,7 +439,20 @@ async def update_deal(deal_id: str, updates: dict, app_state=None) -> bool:
         log.info("deal_props_updated", fields=list(updates.keys()))
         return True
     except Exception as exc:
-        log.error("update_deal_failed", error=str(exc))
+        error_detail = ""
+        if hasattr(exc, "body"):
+            try:
+                import json
+                error_body = json.loads(exc.body) if isinstance(exc.body, str) else exc.body
+                error_detail = error_body.get("message") or str(error_body)
+            except Exception:
+                error_detail = str(exc.body)[:200]
+        
+        log.error(
+            "update_deal_failed",
+            error_type=type(exc).__name__,
+            error_detail=error_detail[:200] if error_detail else None,
+        )
         return False
 
 
@@ -302,6 +467,8 @@ async def book_meeting(
     """
     Create a HubSpot meeting engagement and link it to the contact.
     Returns the meeting ID, or None on failure.
+    
+    Validates meeting properties before sending to HubSpot v3 API.
     """
     log = logger.bind(service="hubspot_book_meeting",
                       session_id=state.get("session_id"))
@@ -315,21 +482,48 @@ async def book_meeting(
     vertical = state.get("vertical", "hvac").replace("_", " ").title()
     issue    = _issue_field(state) or "service request"
     name     = state.get("name") or "Customer"
-    address  = state.get("address") or ""
+    address  = state.get("address", "").strip()
 
     title = f"{vertical} Inspection — {name}"
     if address:
         title += f" @ {address}"
 
+    # Build clean meeting properties
+    props = {
+        "hs_meeting_title": title,
+        "hs_meeting_start_time": str(start_ms),
+        "hs_meeting_end_time": str(end_ms),
+        "hs_meeting_outcome": "SCHEDULED",
+    }
+    
     body = (
         f"Vertical: {vertical}\n"
         f"Issue: {issue}\n"
-        f"Address: {address}\n"
-        f"Urgency: {state.get('urgency') or state.get('ai_urgency') or '—'}\n"
-        f"Score: {state.get('score') or '—'}\n"
-        f"Summary: {state.get('ai_summary') or '—'}\n"
-        f"Session: {state.get('session_id') or '—'}"
     )
+    if address:
+        body += f"Address: {address}\n"
+    
+    urgency = state.get("urgency") or state.get("ai_urgency", "").strip()
+    if urgency:
+        body += f"Urgency: {urgency}\n"
+    
+    score = state.get("score", "").strip()
+    if score:
+        body += f"Score: {score}\n"
+    
+    summary = state.get("ai_summary", "").strip()
+    if summary:
+        body += f"Summary: {summary}\n"
+    
+    session_id = state.get("session_id", "").strip()
+    if session_id:
+        body += f"Session: {session_id}\n"
+    
+    if body:
+        props["hs_meeting_body"] = body.rstrip()
+    
+    if score:
+        props["hs_internal_meeting_notes"] = f"Automedge — score={score}"
 
     try:
         api = _client(app_state)
@@ -338,14 +532,7 @@ async def book_meeting(
         result = await asyncio.to_thread(
             api.crm.objects.meetings.basic_api.create,
             simple_public_object_input_for_create=MeetingCreate(
-                properties={
-                    "hs_meeting_title":          title,
-                    "hs_meeting_body":           body,
-                    "hs_meeting_start_time":     str(start_ms),
-                    "hs_meeting_end_time":       str(end_ms),
-                    "hs_meeting_outcome":        "SCHEDULED",
-                    "hs_internal_meeting_notes": f"Automedge — score={state.get('score')}",
-                }
+                properties=props
             ),
         )
         meeting_id = result.id
@@ -359,11 +546,24 @@ async def book_meeting(
             to_object_id=contact_id,
         )
 
-        log.info("meeting_created", meeting_id=meeting_id, start_ms=start_ms)
+        log.info("meeting_created", meeting_id=meeting_id, start_ms=start_ms, fields=list(props.keys()))
         return meeting_id
 
     except Exception as exc:
-        log.error("book_meeting_failed", error=str(exc))
+        error_detail = ""
+        if hasattr(exc, "body"):
+            try:
+                import json
+                error_body = json.loads(exc.body) if isinstance(exc.body, str) else exc.body
+                error_detail = error_body.get("message") or str(error_body)
+            except Exception:
+                error_detail = str(exc.body)[:200]
+        
+        log.error(
+            "book_meeting_failed",
+            error_type=type(exc).__name__,
+            error_detail=error_detail[:200] if error_detail else None,
+        )
         return None
 
 

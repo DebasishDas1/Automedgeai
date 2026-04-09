@@ -132,7 +132,11 @@ async def _send_email(client: any, to: str, subject: str, html_body: str, tag: s
         logger.info("retell_email_sent", tag=tag, to=to)
         return True
     except Exception as exc:
-        logger.error("retell_email_failed", tag=tag, error=str(exc))
+        logger.error(
+            "retell_email_failed",
+            tag=tag,
+            error_type=type(exc).__name__,
+        )
         return False
 
 
@@ -180,7 +184,10 @@ async def _whatsapp_clinic_alert(client: any, d: dict, booked: bool) -> bool:
         logger.info("retell_wa_sent", booked=booked)
         return True
     except Exception as exc:
-        logger.error("retell_wa_failed", error=str(exc))
+        logger.error(
+            "retell_wa_failed",
+            error_type=type(exc).__name__,
+        )
         return False
 
 
@@ -227,7 +234,11 @@ async def _persist_call_log(d: dict) -> str | None:
             logger.info("retell_call_log_persisted", call_id=d["call_id"], call_log_id=call_log_id)
             return call_log_id
     except Exception as exc:
-        logger.error("retell_call_log_failed", call_id=d["call_id"], error=str(exc))
+        logger.error(
+            "retell_call_log_failed",
+            call_id=d["call_id"][:20] if d.get("call_id") else "unknown",
+            error_type=type(exc).__name__,
+        )
         return None
 
 
@@ -260,7 +271,11 @@ async def _persist_appointment(d: dict, call_log_id: str | None) -> bool:
             logger.info("retell_appointment_persisted", call_id=d["call_id"])
             return True
     except Exception as exc:
-        logger.error("retell_appointment_failed", call_id=d["call_id"], error=str(exc))
+        logger.error(
+            "retell_appointment_failed",
+            call_id=d["call_id"][:20] if d.get("call_id") else "unknown",
+            error_type=type(exc).__name__,
+        )
         return False
 
 
@@ -281,7 +296,11 @@ async def _persist_missed_call(d: dict, call_log_id: str | None) -> bool:
             logger.info("retell_missed_call_persisted", call_id=d["call_id"])
             return True
     except Exception as exc:
-        logger.error("retell_missed_call_failed", call_id=d["call_id"], error=str(exc))
+        logger.error(
+            "retell_missed_call_failed",
+            call_id=d["call_id"][:20] if d.get("call_id") else "unknown",
+            error_type=type(exc).__name__,
+        )
         return False
 
 

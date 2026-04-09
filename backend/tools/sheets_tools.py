@@ -26,7 +26,11 @@ class SheetsTools:
             await asyncio.to_thread(self._append_sync, sheet_id, tab_name, row_data, app_state)
             logger.info("sheets_row_appended", tab=tab_name)
         except Exception as exc:
-            logger.error("sheets_append_failed", error=str(exc), tab=tab_name)
+            logger.error(
+                "sheets_append_failed",
+                error_type=type(exc).__name__,
+                tab=tab_name,
+            )
             raise
 
     def _append_sync(self, sheet_id: str, tab_name: str, row_data: list[Any], app_state=None) -> None:

@@ -49,7 +49,11 @@ class WhatsAppTools:
             )
             return True
         except Exception as exc:
-            logger.error("sms_failed", error=str(exc), to=to)
+            logger.error(
+                "sms_failed",
+                error_type=type(exc).__name__,
+                to=to[:10] if len(to) > 10 else to,
+            )
             return False
 
     @classmethod
@@ -75,7 +79,10 @@ class WhatsAppTools:
             logger.info("wa_sent_to_user", to=to_num)
             return True
         except Exception as exc:
-            logger.error("wa_user_failed", error=str(exc))
+            logger.error(
+                "wa_user_failed",
+                error_type=type(exc).__name__,
+            )
             return False
 
     @classmethod
@@ -104,7 +111,10 @@ class WhatsAppTools:
             logger.info("wa_sent_to_team", to=to_num)
             return True
         except Exception as exc:
-            logger.error("wa_team_failed", error=str(exc))
+            logger.error(
+                "wa_team_failed",
+                error_type=type(exc).__name__,
+            )
             return False
 
     # ── Vertical Helpers ──────────────────────────────────────────────────────

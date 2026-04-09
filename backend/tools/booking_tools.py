@@ -15,17 +15,21 @@ async def create_booking(db: AsyncSession, data: BookingCreate) -> Booking:
     """
     Persist a new demo booking to the database and trigger notifications.
     """
-    log = logger.bind(email=data.email, business=data.business)
+    log = logger.bind(vertical=data.vertical)
     
     try:
-        # 1. Create DB record
+        # 1. Validate input
+        if not data.name or not data.email or not data.business:
+            raise ValueError("name, email, and business are required fields")
+        
+        # 2. Create DB record
         new_booking = Booking(
-            name=data.name,
-            email=data.email,
-            business=data.business,
+            name=data.name.strip(),
+            email=data.email.strip(),
+            business=data.business.strip(),
             vertical=data.vertical,
-            team_size=data.team_size,
-            message=data.message,
+            team_size=data.team_size.strip() if data.team_size else None,
+            message=data.message.strip() if data.message else None,
             scheduled_at=data.scheduled_at,
         )
         db.add(new_booking)
@@ -34,20 +38,19 @@ async def create_booking(db: AsyncSession, data: BookingCreate) -> Booking:
         
         log.info("booking_persisted", id=str(new_booking.id))
         
-        # 2. Notify team (Background or synchronous? Let's do a simple notification here for now)
-        # In a high-scale app, this would be a background task.
+        # 3. Optional notification (implement if needed)
         try:
             from tools.email_tools import email_tools
             # Construct a small state dict for the existing email tool or implement a custom one
             # For now, let's just log it. If you want full email integration, we'd add it here.
             pass 
         except Exception as e:
-            log.warning("booking_notification_failed", error=str(e))
+            log.warning("booking_notification_failed", error_type=type(e).__name__)
 
         return new_booking
 
     except Exception as e:
-        log.error("create_booking_failed", error=str(e))
+        log.error("create_booking_failed", error_type=type(e).__name__)
         await db.rollback()
         raise e
 

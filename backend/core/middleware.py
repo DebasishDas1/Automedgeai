@@ -15,12 +15,14 @@ def setup_middleware(app: FastAPI):
     Applies CORS, GZip, and custom request isolation middleware.
     """
     # 1. CORS
+    # Use explicit allow list even in dev, never use wildcard "*" with allow_credentials
+    cors_origins = ["http://localhost:3000", "http://localhost:3001"] if settings.is_dev else settings.ALLOWED_ORIGINS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"] if settings.is_dev else settings.ALLOWED_ORIGINS,
+        allow_origins=cors_origins,
         allow_origin_regex=settings.cors_origin_regex if not settings.is_dev else None,
-        allow_credentials=not settings.is_dev,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_credentials=True if settings.is_dev else False,
+        allow_methods=["GET", "POST", "OPTIONS", "PUT", "PATCH", "DELETE"],
         allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
     )
 
@@ -51,7 +53,12 @@ def setup_middleware(app: FastAPI):
             raise exc
         except Exception as exc:
             duration_ms = int((time.perf_counter() - start) * 1000)
-            logger.error("request_crashed", error=str(exc), latency_ms=duration_ms)
+            # Log exception type but not full message to prevent logging sensitive data
+            logger.error(
+                "request_crashed",
+                error_type=type(exc).__name__,
+                latency_ms=duration_ms,
+            )
             return ORJSONResponse(
                 {"detail": "internal_server_error", "request_id": request_id},
                 status_code=500,
