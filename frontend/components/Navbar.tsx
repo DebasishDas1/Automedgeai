@@ -62,7 +62,7 @@ export function Navbar() {
           className="relative w-35 h-10 flex items-center"
         >
           <Image
-            src="/AutomEdge-logo-light.png"
+            src="/AutomEdge-logo-light-1.png"
             alt="AutomEdge logo"
             fill
             priority
@@ -70,7 +70,7 @@ export function Navbar() {
             className="object-contain dark:hidden select-none pointer-events-none"
           />
           <Image
-            src="/AutomEdge-logo.png"
+            src="/AutomEdge-logo-light-1.png"
             alt="AutomEdge logo"
             fill
             priority

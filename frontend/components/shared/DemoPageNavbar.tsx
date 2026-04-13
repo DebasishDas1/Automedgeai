@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useDomainNavigation } from "@/hook/useDomainNavigation";
@@ -20,28 +20,22 @@ import {
 
 import { Equal } from "lucide-react";
 
-// const navItems = [
-//   { label: "How it Works", href: "#how-it-works" },
-//   { label: "Roi Calculator", href: "#roi" },
-//   { label: "Faq", href: "#faq" },
-// ];
-
 function NavLinks({
   className = "",
   closeOnClick = false,
-  navItems,
+  navItems = [],
 }: {
   className?: string;
   closeOnClick?: boolean;
   navItems?: { label: string; href: string }[];
 }) {
-  return (
-    <div className={`flex flex-col lg:flex-row gap-6 ${className}`}>
-      {navItems?.map((item) => {
-        const linkEl = (
+  const links = useMemo(
+    () =>
+      navItems.map((item) => {
+        const link = (
           <Link
             href={item.href}
-            className="font-semibold hover:text-accent lg:py-4"
+            className="font-semibold hover:text-accent transition-colors lg:py-4"
           >
             {item.label}
           </Link>
@@ -49,12 +43,24 @@ function NavLinks({
 
         return closeOnClick ? (
           <DrawerClose key={item.label} asChild>
-            {linkEl}
+            {link}
           </DrawerClose>
         ) : (
-          <div key={item.label}>{linkEl}</div>
+          <Link
+            key={item.label}
+            href={item.href}
+            className="font-semibold hover:text-accent transition-colors lg:py-4"
+          >
+            {item.label}
+          </Link>
         );
-      })}
+      }),
+    [navItems, closeOnClick],
+  );
+
+  return (
+    <div className={`flex flex-col lg:flex-row gap-6 ${className}`}>
+      {links}
     </div>
   );
 }
@@ -66,19 +72,17 @@ type DemoPageNavbarProps = {
 
 export const DemoPageNavbar = ({ iconLink, navItems }: DemoPageNavbarProps) => {
   const { goTo } = useDomainNavigation();
-
   const [isScrolled, setIsScrolled] = useState(false);
 
-  useEffect(() => {
-    const updateScroll = () => {
-      const y = window.scrollY;
-      setIsScrolled(y > 20);
-    };
-
-    updateScroll();
-    window.addEventListener("scroll", updateScroll, { passive: true });
-    return () => window.removeEventListener("scroll", updateScroll);
+  const handleScroll = useCallback(() => {
+    setIsScrolled(window.scrollY > 20);
   }, []);
+
+  useEffect(() => {
+    handleScroll(); // initial check
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [handleScroll]);
 
   return (
     <nav
@@ -92,39 +96,43 @@ export const DemoPageNavbar = ({ iconLink, navItems }: DemoPageNavbarProps) => {
         {/* Logo */}
         <button
           onClick={() => goTo(iconLink)}
-          className="relative w-35 h-10 cursor-pointer hover:opacity-80 transition-opacity"
+          aria-label="Go to home"
+          className="relative w-36 h-10 hover:opacity-80 transition-opacity"
         >
           <Image
-            src="/AutomEdge-logo-light.png"
+            src="/AutomEdge-logo-light-1.png"
             alt="AutomEdge logo"
             fill
             priority
             sizes="140px"
-            className="object-contain dark:hidden select-none pointer-events-none"
+            className="object-contain dark:hidden pointer-events-none"
           />
           <Image
-            src="/AutomEdge-logo.png"
+            src="/AutomEdge-logo-light-1.png"
             alt="AutomEdge logo"
             fill
             priority
             sizes="140px"
-            className="object-contain hidden dark:block select-none pointer-events-none"
+            className="object-contain hidden dark:block pointer-events-none"
           />
         </button>
 
-        {/* Desktop CTA + Mobile Menu */}
+        {/* Right side */}
         <div className="flex items-center gap-4">
           {/* Desktop CTA */}
           <Link href="#calendar" className="hidden sm:block">
-            <Button className="px-6 py-5 bg-cta text-[#412402] font-bold shadow-xl glow-cta hover:-translate-y-0.5 transition-all rounded-xl">
+            <Button className="px-6 py-5 bg-cta text-[#412402] font-bold shadow-xl hover:-translate-y-0.5 transition-all rounded-xl">
               Book My Demo
             </Button>
           </Link>
 
           {/* Mobile Drawer */}
           <Drawer direction="top">
-            <DrawerTrigger className="md:hidden p-2 rounded-md hover:bg-muted">
-              <Equal className="h-6 w-6" aria-label="Menu" />
+            <DrawerTrigger
+              aria-label="Open menu"
+              className="md:hidden p-2 rounded-md hover:bg-muted transition"
+            >
+              <Equal className="h-6 w-6" />
             </DrawerTrigger>
 
             <DrawerContent className="pt-10 px-10 bg-background/60 backdrop-blur-xl">

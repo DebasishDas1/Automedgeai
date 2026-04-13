@@ -10,12 +10,11 @@ import {
   TESTIMONIALS,
 } from "./constants";
 
-
-
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { PositioningSection } from "@/components/PositioningSection";
 import { DemoPageNavbar } from "@/components/shared/DemoPageNavbar";
-import {DirectContactSection} from "@/components/DirectContactSection";
+import { DirectContactSection } from "@/components/DirectContactSection";
+import { YoutubeEmbed } from "@/components/shared/YoutubeEmbed";
 
 import { ClinicHero } from "@/components/ClinicHero";
 
@@ -85,7 +84,7 @@ const navItems = [
   { label: "How it Works", href: "#how-it-works" },
   { label: "Services", href: "#services" },
   { label: "Impact", href: "#impact" },
-  { label: "Testimonials", href: "#testimonials" },
+  { label: "Watch Live Demo", href: "#youtube-demo" },
   { label: "Direct Contact", href: "#direct-contact" },
 ];
 
@@ -103,13 +102,29 @@ export default function ClinicPage() {
         <ImpactSection impacts={IMPACTS} />
         <TestimonialSection testimonials={TESTIMONIALS} />
         <PositioningSection />
+
+        <section id="youtube-demo" className="text-center space-y-8 py-16">
+          <h2 className="text-3xl md:text-5xl font-black">
+            See It Book Appointments in Real Time
+          </h2>
+          <p className="text-muted-foreground max-w-xl mx-auto">
+            From incoming lead → AI response → confirmed booking. No human
+            needed.
+          </p>
+
+          <YoutubeEmbed videoId="bDDlgM686Ds" />
+        </section>
+
         <DemoPageCalendar
           title="Ready to see it in action?"
           highlight="Book a 15-minute demo"
           description="15 minutes. We show you exactly what this looks like built for your business — your branding, your calendar, your CRM. No pitch. No pressure."
           type="clinic"
         />
-        <DirectContactSection whatsappNumber={"9073896612"} email={"team.automedgeai@gmail.com"} />
+        <DirectContactSection
+          whatsappNumber={"9073896612"}
+          email={"team.automedgeai@gmail.com"}
+        />
       </div>
     </main>
   );

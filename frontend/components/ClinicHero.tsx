@@ -22,9 +22,9 @@ export const ClinicHero = () => {
         variant: "default" as const,
       },
       {
-        text: "Direct Contact",
+        text: "Watch Live Demo",
         onClick: () => {
-          const el = document.getElementById("direct-contact");
+          const el = document.getElementById("youtube-demo");
           el?.scrollIntoView({ behavior: "smooth" });
         },
         variant: "outline" as const,

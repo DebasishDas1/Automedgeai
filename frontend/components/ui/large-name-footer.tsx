@@ -41,14 +41,14 @@ export function Footer() {
               className="flex items-center relative w-[200px] h-[60px] hover:opacity-80 transition-opacity"
             >
               <Image
-                src="/AutomEdge-logo-light.png"
+                src="/AutomEdge-logo-light-1.png"
                 alt="AutomEdge logo"
                 fill
                 sizes="200px"
                 className="object-contain dark:hidden select-none"
               />
               <Image
-                src="/AutomEdge-logo.png"
+                src="/AutomEdge-logo-light-1.png"
                 alt="AutomEdge logo"
                 fill
                 sizes="200px"

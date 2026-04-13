@@ -50,13 +50,13 @@ const HeroSection = ({
               30% more patients booked in first month
             </p>
 
-            <div className="flex gap-4 flex-row flex-nowrap">
+            <div className="flex gap-4 flex-row flex-nowrap justify-center">
               {actions.map((action, i) => (
                 <Button
                   key={i}
                   onClick={action.onClick}
                   variant={action.variant as any}
-                  className="rounded-2xl px-8 py-7 text-lg font-bold transition-all hover:-translate-y-1 hover:text-accent whitespace-nowrap"
+                  className="rounded-2xl px-6 py-5 text-base font-semibold whitespace-nowrap hover:text-cta/80"
                 >
                   {action.text}
                 </Button>
