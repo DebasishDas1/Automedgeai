@@ -10,7 +10,7 @@ type ServicesSectionProps = {
 
 export function ServicesSection({ services }: ServicesSectionProps) {
   return (
-    <section id="solution" className="py-24 md:py-32 px-4 md:px-8 scroll-mt-24">
+    <section id="services" className="py-24 md:py-32 px-4 md:px-8 scroll-mt-24">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-20">

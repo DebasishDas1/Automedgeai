@@ -20,22 +20,24 @@ import {
 
 import { Equal } from "lucide-react";
 
-const navItems = [
-  { label: "How it Works", href: "#how-it-works" },
-  { label: "Roi Calculator", href: "#roi" },
-  { label: "Faq", href: "#faq" },
-];
+// const navItems = [
+//   { label: "How it Works", href: "#how-it-works" },
+//   { label: "Roi Calculator", href: "#roi" },
+//   { label: "Faq", href: "#faq" },
+// ];
 
 function NavLinks({
   className = "",
   closeOnClick = false,
+  navItems,
 }: {
   className?: string;
   closeOnClick?: boolean;
+  navItems?: { label: string; href: string }[];
 }) {
   return (
     <div className={`flex flex-col lg:flex-row gap-6 ${className}`}>
-      {navItems.map((item) => {
+      {navItems?.map((item) => {
         const linkEl = (
           <Link
             href={item.href}
@@ -57,8 +59,13 @@ function NavLinks({
   );
 }
 
-export const DemoPageNavbar = () => {
-  const { goHome } = useDomainNavigation();
+type DemoPageNavbarProps = {
+  iconLink?: string;
+  navItems?: { label: string; href: string }[];
+};
+
+export const DemoPageNavbar = ({ iconLink, navItems }: DemoPageNavbarProps) => {
+  const { goTo } = useDomainNavigation();
 
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -84,7 +91,7 @@ export const DemoPageNavbar = () => {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 lg:px-8">
         {/* Logo */}
         <button
-          onClick={goHome}
+          onClick={() => goTo(iconLink)}
           className="relative w-35 h-10 cursor-pointer hover:opacity-80 transition-opacity"
         >
           <Image
@@ -121,9 +128,9 @@ export const DemoPageNavbar = () => {
             </DrawerTrigger>
 
             <DrawerContent className="pt-10 px-10 bg-background/60 backdrop-blur-xl">
-              <DrawerHeader onClick={goHome}>
+              <DrawerHeader onClick={() => goTo(iconLink)}>
                 <DrawerTitle className="text-start text-muted-foreground text-base">
-                  AutomEdge
+                  AutomEdgeAi
                 </DrawerTitle>
                 <DrawerDescription className="text-start text-muted-foreground font-thin text-sm">
                   AI-Powered Lead Response for Home Service Businesses
@@ -132,7 +139,8 @@ export const DemoPageNavbar = () => {
 
               <NavLinks
                 closeOnClick
-                className="text-3xl font-bold py-10 text-primary ml-3"
+                className="text-3xl font-bold py-5 text-primary ml-3"
+                navItems={navItems}
               />
 
               <DrawerFooter className="mt-auto flex justify-start pb-10">

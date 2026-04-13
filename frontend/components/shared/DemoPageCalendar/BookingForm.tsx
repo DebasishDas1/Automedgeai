@@ -6,7 +6,12 @@ import { format } from "date-fns";
 type BookingFormProps = {
   selectedSlot: Date | null;
   formData: { name: string; email: string; website: string; teamSize: string };
-  setFormData: (data: { name: string; email: string; website: string; teamSize: string }) => void;
+  setFormData: (data: {
+    name: string;
+    email: string;
+    website: string;
+    teamSize: string;
+  }) => void;
   onConfirm: (e: React.FormEvent) => void;
   onBack: () => void;
   isSubmitting?: boolean;
@@ -67,9 +72,10 @@ export const BookingForm = ({
         </div>
         <div className="space-y-3">
           <label className="text-sm font-black text-foreground/70 ml-2 tracking-wide uppercase">
-            Company Website (Optional)
+            Company Name
           </label>
           <input
+            required
             type="text"
             placeholder="e.g. www.hvacpros.com"
             value={formData.website}

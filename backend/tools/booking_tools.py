@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import Booking
 from models.booking import BookingCreate
 from core.config import settings
+from tools.sheets_tools import sheets_tools
 
 logger = structlog.get_logger(__name__)
 
@@ -38,7 +39,28 @@ async def create_booking(db: AsyncSession, data: BookingCreate) -> Booking:
         
         log.info("booking_persisted", id=str(new_booking.id))
         
-        # 3. Optional notification (implement if needed)
+        # 3. Sheet sync
+        try:
+            # Specific Google Sheet for demo bookings
+            sheet_id = "1PLyL0qRutitXAM1Gpw7kfZLGJkj_Q5CeUOO3ZzBMiFA"
+            
+            row = [
+                _utcnow(),
+                data.name,
+                data.email,
+                data.business,
+                data.vertical,
+                data.team_size or "",
+                data.message or "",
+                data.scheduled_at.isoformat() if data.scheduled_at else ""
+            ]
+            header = ["Timestamp", "Name", "Email", "Business", "Vertical", "Team Size", "Message", "Scheduled At"]
+            await sheets_tools.append_lead(sheet_id, "Demo Bookings", row, header=header)
+            
+        except Exception as e:
+            log.warning("sheets_sync_failed", error=str(e))
+
+        # 4. Optional notification (implement if needed)
         try:
             from tools.email_tools import email_tools
             # Construct a small state dict for the existing email tool or implement a custom one

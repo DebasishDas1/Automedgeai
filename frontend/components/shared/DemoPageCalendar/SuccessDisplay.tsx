@@ -47,14 +47,10 @@ export const SuccessDisplay = ({
       <div className="flex flex-col sm:flex-row gap-6 w-full max-w-md">
         <Button
           variant="outline"
-          className="flex-1 h-16 rounded-2xl font-black border-2 border-border/60 text-lg hover:bg-muted/50 transition-all active:scale-95"
+          className="flex-1 h-16 rounded-2xl font-black border-2 border-border/60 text-lg hover:text-cta transition-all active:scale-95"
           onClick={onReschedule}
         >
           Reschedule
-        </Button>
-        <Button className="flex-1 bg-cta gap-4 h-16 rounded-2xl font-black glow-cta shadow-xl text-lg hover:-translate-y-1 active:scale-95 transition-all">
-          <Video className="w-6 h-6" />
-          Join Meet (Test)
         </Button>
       </div>
     </motion.div>

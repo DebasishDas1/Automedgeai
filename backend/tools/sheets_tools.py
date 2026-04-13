@@ -16,14 +16,14 @@ _HEADER = [
 ]
 
 class SheetsTools:
-    async def append_lead(self, sheet_id: str, tab_name: str, row_data: list[Any], app_state=None) -> None:
+    async def append_lead(self, sheet_id: str, tab_name: str, row_data: list[Any], app_state=None, header: list[str] | None = None) -> None:
         """Append a row to the given tab. Creates the tab + header if missing."""
         if not sheet_id:
             logger.warning("sheets_skip_no_sheet_id", tab=tab_name)
             return
         try:
             # Delegate to thread to avoid blocking the event loop on gspread's network calls
-            await asyncio.to_thread(self._append_sync, sheet_id, tab_name, row_data, app_state)
+            await asyncio.to_thread(self._append_sync, sheet_id, tab_name, row_data, app_state, header)
             logger.info("sheets_row_appended", tab=tab_name)
         except Exception as exc:
             logger.error(
@@ -33,7 +33,7 @@ class SheetsTools:
             )
             raise
 
-    def _append_sync(self, sheet_id: str, tab_name: str, row_data: list[Any], app_state=None) -> None:
+    def _append_sync(self, sheet_id: str, tab_name: str, row_data: list[Any], app_state=None, header: list[str] | None = None) -> None:
         """
         Internal sync method for gspread calls. Performs network IO, 
         must be called via asyncio.to_thread.
@@ -44,14 +44,17 @@ class SheetsTools:
             client = get_sheets_client()
         
         spreadsheet = client.open_by_key(sheet_id)
+        
+        # Use provided header or default
+        use_header = header if header is not None else _HEADER
 
         try:
             worksheet = spreadsheet.worksheet(tab_name)
         except Exception:
             # Create if missing
-            worksheet = spreadsheet.add_worksheet(title=tab_name, rows=1000, cols=len(_HEADER))
+            worksheet = spreadsheet.add_worksheet(title=tab_name, rows=1000, cols=len(use_header))
             # Insert header as the first row
-            worksheet.insert_row(_HEADER, 1)
+            worksheet.insert_row(use_header, 1)
         
         # Append the new row data
         worksheet.append_row(row_data)

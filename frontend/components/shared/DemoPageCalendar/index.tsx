@@ -119,10 +119,6 @@ export const DemoPageCalendar = ({
       id="calendar"
       className="relative py-28 px-6 max-w-6xl mx-auto scroll-mt-24 w-full flex flex-col items-center overflow-hidden"
     >
-      {/* Background Blobs */}
-      <div className="absolute top-1/2 left-0 w-150 h-150 bg-accent/10 rounded-full blur-[140px] -translate-y-1/2 -z-10 pointer-events-none animate-pulse" />
-      <div className="absolute bottom-0 right-0 w-100 h-100 bg-primary/5 rounded-full blur-[120px] -z-10 pointer-events-none animate-pulse delay-1000" />
-
       <CalendarHeader
         title={title}
         highlight={highlight}
@@ -230,19 +226,6 @@ export const DemoPageCalendar = ({
           </AnimatePresence>
         </Card>
       </motion.div>
-
-      <div className="flex gap-4 md:gap-10 flex-wrap items-center justify-center mt-16 bg-muted/10 py-5 px-10 rounded-full border-2 border-border/30 backdrop-blur-md max-w-fit mx-auto shadow-sm">
-        {tags.map((tag) => (
-          <Badge
-            variant="outline"
-            key={tag}
-            className="flex gap-3 text-muted-foreground/80 font-black border-none hover:text-accent transition-colors"
-          >
-            <Check className="w-5 h-5 text-accent stroke-[3px]" />
-            {tag}
-          </Badge>
-        ))}
-      </div>
     </section>
   );
 };

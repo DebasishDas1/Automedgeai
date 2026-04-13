@@ -123,10 +123,16 @@ const STEPS = [
   },
 ];
 
+const navItems = [
+  { label: "How it Works", href: "#how-it-works" },
+  { label: "Roi Calculator", href: "#roi" },
+  { label: "Faq", href: "#faq" },
+];
+
 export default function PestControlPage() {
   return (
     <main className="min-h-screen">
-      <DemoPageNavbar />
+      <DemoPageNavbar navItems={navItems} />
       <CallAgent type={"pest_control"} />
 
       <DemoPageHero
